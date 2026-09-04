@@ -1,15 +1,18 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import Image from "next/image";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
 import { ArrowLeft, ArrowUpRight } from "lucide-react";
 import InstagramIcon from "@/components/site/instagram-icon";
+import AutoplayVideo from "@/components/site/autoplay-video";
 import {
   getAllProjectSlugs,
   getPublicProject,
   getProjectMediaViews,
 } from "@/lib/public";
 import type { MediaView } from "@/lib/media";
+import { loaderSrc } from "@/lib/image-loader";
 import { CATEGORY_LABELS } from "@/components/site/work-list";
 
 export const revalidate = 60;
@@ -56,12 +59,9 @@ function GalleryMedia({ media, index }: { media: MediaView; index: number }) {
   if (media.type === "video") {
     return (
       <figure>
-        <video
+        <AutoplayVideo
           src={media.url}
-          controls
-          muted
-          playsInline
-          preload="metadata"
+          label={media.altText ?? "Project video"}
           className="block max-h-[85vh] w-full bg-line object-contain"
         />
         {media.altText ? (
@@ -75,18 +75,28 @@ function GalleryMedia({ media, index }: { media: MediaView; index: number }) {
 
   return (
     <figure>
-      {/* Plain <img> until Phase 6 introduces the responsive R2 loader. */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={media.url}
-        alt={media.altText ?? ""}
-        width={media.width ?? undefined}
-        height={media.height ?? undefined}
-        loading={index === 0 ? "eager" : "lazy"}
-        decoding="async"
-        fetchPriority={index === 0 ? "high" : "auto"}
-        className="block w-full bg-line"
-      />
+      {media.width && media.height ? (
+        <Image
+          src={loaderSrc(media.originalUrl, media.variantWidths)}
+          alt={media.altText ?? ""}
+          width={media.width}
+          height={media.height}
+          sizes="(min-width: 1024px) 1056px, 100vw"
+          priority={index === 0}
+          fetchPriority={index === 0 ? "high" : "auto"}
+          className="h-auto w-full bg-line"
+        />
+      ) : (
+        // Variant generation failed — show the original file as-is.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={media.url}
+          alt={media.altText ?? ""}
+          loading={index === 0 ? "eager" : "lazy"}
+          decoding="async"
+          className="block w-full bg-line"
+        />
+      )}
       {media.altText ? (
         <figcaption className="mono-meta mt-3 text-[11px] uppercase tracking-[0.18em] text-muted">
           {media.altText}

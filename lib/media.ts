@@ -30,7 +30,12 @@ export function pickDisplayVariant(variants: VariantMap | null) {
 export type MediaView = {
   id: string;
   type: "image" | "video";
+  /** Preferred display URL (md variant for images, original for video). */
   url: string;
+  /** Public URL of the original object (images only; for the image loader). */
+  originalUrl: string;
+  /** Widths (px) of the WebP variants that actually exist for this image. */
+  variantWidths: number[];
   width: number | null;
   height: number | null;
   fileSizeBytes: number | null;
@@ -47,6 +52,8 @@ export function buildMediaView(row: Media): MediaView {
       id: row.id,
       type: "video",
       url: originalUrl,
+      originalUrl,
+      variantWidths: [],
       width: row.width,
       height: row.height,
       fileSizeBytes: row.fileSizeBytes,
@@ -58,11 +65,19 @@ export function buildMediaView(row: Media): MediaView {
 
   const variants = parseVariants(row.variants);
   const display = pickDisplayVariant(variants);
+  const variantWidths = variants
+    ? [variants.sm, variants.md, variants.lg]
+        .filter((v): v is NonNullable<typeof v> => Boolean(v))
+        .map((v) => v.width)
+        .sort((a, b) => a - b)
+    : [];
 
   const view: MediaView = {
     id: row.id,
     type: "image",
     url: display ? publicMediaUrl(display.webpKey) : originalUrl,
+    originalUrl,
+    variantWidths,
     width: display?.width ?? row.width,
     height: display?.height ?? row.height,
     fileSizeBytes: row.fileSizeBytes,

@@ -109,16 +109,28 @@ try {
   check("cover image uploaded", confirmRes.ok() && typeof coverUrl === "string");
 
   // 4. The public home page shows the project (ISR on-demand revalidation).
-  await page.goto(`${BASE_URL}/`);
-  await page.getByText(TITLE).waitFor({ timeout: 20000 });
-  check("home lists the new project after revalidation", true);
+  // ISR regenerates on the request *after* the revalidation is triggered, so
+  // reload until the fresh markup arrives.
+  let homeShows = false;
+  for (let i = 0; i < 6; i++) {
+    await page.goto(`${BASE_URL}/`);
+    const visible = await page.getByText(TITLE).isVisible().catch(() => false);
+    if (visible) { homeShows = true; break; }
+    await page.waitForTimeout(1500);
+  }
+  check("home lists the new project after revalidation", homeShows);
   const homeImgs = await page.locator("main img").count();
   check("home renders project images", homeImgs > 0, `${homeImgs} images`);
 
   // 5. Category page shows it under Photography.
-  await page.goto(`${BASE_URL}/photography`);
-  await page.getByText(TITLE).waitFor({ timeout: 20000 });
-  check("photography page lists the project", true);
+  let categoryShows = false;
+  for (let i = 0; i < 6; i++) {
+    await page.goto(`${BASE_URL}/photography`);
+    const visible = await page.getByText(TITLE).isVisible().catch(() => false);
+    if (visible) { categoryShows = true; break; }
+    await page.waitForTimeout(1500);
+  }
+  check("photography page lists the project", categoryShows);
 
   // 6. Project page renders title, meta and the uploaded image.
   await page.goto(`${BASE_URL}/work/${SLUG}`);
@@ -128,7 +140,13 @@ try {
   const projImg = page.locator("article img").first();
   await projImg.waitFor();
   const src = await projImg.getAttribute("src");
+  const srcset = await projImg.getAttribute("srcset");
   check("project page image points at R2", /^https:\/\//.test(src ?? ""), src?.slice(0, 60));
+  check(
+    "image resolved to a WebP variant by the R2 loader",
+    (src ?? "").endsWith(".webp") && srcset?.length > 0,
+    `${src?.split("/").pop()} (srcset ${srcset?.split(",").length} candidates)`
+  );
 
   // 7. Theme toggle: default black, click -> olive, persists after reload.
   const html = page.locator("html");
@@ -141,6 +159,8 @@ try {
     undefined,
     { timeout: 5000 }
   );
+  // Let the 500ms color cross-fade finish before sampling the background.
+  await page.waitForTimeout(800);
   const bgOlive = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
   check("toggle switches body to olive", bgOlive === "rgb(103, 122, 4)", bgOlive);
 
@@ -156,7 +176,9 @@ try {
     undefined,
     { timeout: 5000 }
   );
-  check("theme returns to black", true);
+  await page.waitForTimeout(800);
+  const bgBack = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  check("theme returns to black", bgBack === "rgb(0, 0, 0)", bgBack);
 } catch (err) {
   check("public flow completed without errors", false, err.message);
 } finally {

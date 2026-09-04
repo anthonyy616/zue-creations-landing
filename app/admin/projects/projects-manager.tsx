@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import type { Project } from "@/db/schema";
 import ProjectForm from "./project-form";
@@ -19,7 +18,6 @@ export default function ProjectsManager({
 }: {
   initialProjects: Project[];
 }) {
-  const router = useRouter();
   const [projects, setProjects] = useState(initialProjects);
   const [creating, setCreating] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);

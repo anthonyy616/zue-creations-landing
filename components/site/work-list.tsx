@@ -1,8 +1,11 @@
 import Link from "next/link";
+import Image from "next/image";
 import { format } from "date-fns";
 import { ArrowUpRight } from "lucide-react";
 import type { ProjectCard } from "@/lib/public";
 import type { MediaView } from "@/lib/media";
+import { loaderSrc } from "@/lib/image-loader";
+import AutoplayVideo from "./autoplay-video";
 
 export const CATEGORY_LABELS: Record<string, string> = {
   photography: "Photography",
@@ -13,27 +16,33 @@ export const CATEGORY_LABELS: Record<string, string> = {
 function CoverMedia({ media }: { media: MediaView }) {
   if (media.type === "video") {
     return (
-      <video
+      <AutoplayVideo
         src={media.url}
-        muted
-        playsInline
-        preload="metadata"
-        aria-label="Video preview"
+        label={media.altText ?? "Video preview"}
         className="h-full w-full object-cover"
       />
     );
   }
-  // Plain <img> for now; Phase 6 swaps this for next/image with the R2 loader.
-  // eslint-disable-next-line @next/next/no-img-element
+  if (!media.width || !media.height) {
+    // Variant generation failed for this image — fall back to the original.
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={media.url}
+        alt={media.altText ?? ""}
+        loading="lazy"
+        decoding="async"
+        className="h-full w-full object-cover"
+      />
+    );
+  }
   return (
-    <img
-      src={media.url}
+    <Image
+      src={loaderSrc(media.originalUrl, media.variantWidths)}
       alt={media.altText ?? ""}
-      width={media.width ?? 1200}
-      height={media.height ?? 900}
-      loading="lazy"
-      decoding="async"
-      className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.04]"
+      fill
+      sizes="(min-width: 1024px) 640px, 92vw"
+      className="object-cover transition-transform duration-700 ease-out group-hover:scale-[1.04]"
     />
   );
 }
