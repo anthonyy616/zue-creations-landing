@@ -3,7 +3,7 @@
  * env vars; the fallbacks keep the public site renderable before any of them
  * are set (links are hidden rather than broken).
  */
-export const SITE_NAME = process.env.NEXT_PUBLIC_SITE_NAME || "Creative Portfolio";
+export const SITE_NAME = process.env.NEXT_PUBLIC_SITE_NAME || "Zue Creatives";
 
 export const SITE_URL = (
   process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"
