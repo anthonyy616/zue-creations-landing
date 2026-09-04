@@ -2,7 +2,9 @@ import { notFound, redirect } from "next/navigation";
 import AdminNav from "@/components/admin-nav";
 import { requireAdminSession } from "@/lib/session";
 import { getProjectById } from "@/lib/projects";
+import { getMediaByProject, buildMediaView } from "@/lib/media";
 import ProjectForm from "../project-form";
+import MediaManager from "../media-manager";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +21,8 @@ export default async function AdminProjectEditPage({
   const project = await getProjectById(id);
   if (!project) notFound();
 
+  const mediaRows = await getMediaByProject(id);
+
   return (
     <main className="min-h-screen bg-zinc-950">
       <AdminNav />
@@ -26,11 +30,15 @@ export default async function AdminProjectEditPage({
         <h1 className="mb-6 text-2xl font-semibold text-white">
           Edit project
         </h1>
-        <section className="rounded-lg border border-zinc-800 bg-zinc-900 p-6">
+        <section className="mb-10 rounded-lg border border-zinc-800 bg-zinc-900 p-6">
           <ProjectForm project={project} backHref="/admin/projects" />
         </section>
-
-        {/* Media uploader for this project is added in Phase 4. */}
+        <section className="rounded-lg border border-zinc-800 bg-zinc-900 p-6">
+          <MediaManager
+            projectId={project.id}
+            initialMedia={mediaRows.map(buildMediaView)}
+          />
+        </section>
       </div>
     </main>
   );
