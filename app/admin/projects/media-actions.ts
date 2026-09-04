@@ -1,10 +1,10 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { media, projects } from "@/db/schema";
 import { requireAdminSession } from "@/lib/session";
+import { revalidateMediaForProject } from "@/lib/revalidate";
 
 export async function reorderMedia(
   projectId: string,
@@ -15,7 +15,7 @@ export async function reorderMedia(
   }
 
   const [project] = await db
-    .select({ slug: projects.slug })
+    .select({ slug: projects.slug, category: projects.category })
     .from(projects)
     .where(eq(projects.id, projectId))
     .limit(1);
@@ -40,6 +40,6 @@ export async function reorderMedia(
     }
   });
 
-  revalidatePath(`/work/${project.slug}`);
+  revalidateMediaForProject(project.slug, project.category);
   return { ok: true };
 }

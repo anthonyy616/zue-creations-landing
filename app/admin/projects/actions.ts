@@ -1,11 +1,11 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { projects } from "@/db/schema";
 import { requireAdminSession } from "@/lib/session";
+import { revalidateProjectPublic } from "@/lib/revalidate";
 import { projectFormSchema } from "./schema";
 
 import type { ProjectFormValues, ActionResult } from "./schema";
@@ -27,14 +27,7 @@ function normalizeValues(values: ProjectFormValues) {
   };
 }
 
-/** Revalidates every public route that can display a project. */
-function revalidateProjectPaths(slug?: string) {
-  revalidatePath("/");
-  revalidatePath("/photography");
-  revalidatePath("/cinematography");
-  revalidatePath("/branding");
-  if (slug) revalidatePath(`/work/${slug}`);
-}
+
 
 export async function createProject(
   rawValues: ProjectFormValues
@@ -60,7 +53,7 @@ export async function createProject(
   }
 
   const [created] = await db.insert(projects).values(data).returning();
-  revalidateProjectPaths(created.slug);
+  revalidateProjectPublic(created.slug, created.category);
   redirect(`/admin/projects/${created.id}`);
 }
 
@@ -98,7 +91,7 @@ export async function updateProject(
     return { ok: false, error: "Project not found" };
   }
 
-  revalidateProjectPaths(updated.slug);
+  revalidateProjectPublic(updated.slug, updated.category);
   return { ok: true };
 }
 
@@ -115,13 +108,13 @@ export async function deleteProject(id: string): Promise<ActionResult> {
   // Media rows cascade on delete. R2 object cleanup is handled in the
   // media pipeline (deleteMedia) before a project with media is removed.
   await db.delete(projects).where(eq(projects.id, id));
-  revalidateProjectPaths(existing.slug);
+  revalidateProjectPublic(existing.slug, existing.category);
   return { ok: true };
 }
 
 async function getProjectByIdForAction(id: string) {
   const rows = await db
-    .select({ id: projects.id, slug: projects.slug })
+    .select({ id: projects.id, slug: projects.slug, category: projects.category })
     .from(projects)
     .where(eq(projects.id, id))
     .limit(1);

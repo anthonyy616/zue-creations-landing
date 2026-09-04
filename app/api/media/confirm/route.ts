@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { revalidatePath } from "next/cache";
 import { eq, max } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { media, projects, mediaTypeEnum } from "@/db/schema";
 import { requireAdminSession } from "@/lib/session";
+import { revalidateMediaForProject } from "@/lib/revalidate";
 import { generateImageVariants } from "@/lib/image";
 import { buildMediaView } from "@/lib/media";
 
@@ -38,7 +38,7 @@ export async function POST(request: Request) {
   const { projectId, key, type, fileSizeBytes } = parsed.data;
 
   const project = await db
-    .select({ id: projects.id, slug: projects.slug })
+    .select({ id: projects.id, slug: projects.slug, category: projects.category })
     .from(projects)
     .where(eq(projects.id, projectId))
     .limit(1);
@@ -83,8 +83,7 @@ export async function POST(request: Request) {
     })
     .returning();
 
-  revalidatePath(`/work/${project[0].slug}`);
-  revalidatePath("/");
+  revalidateMediaForProject(project[0].slug, project[0].category);
 
   return NextResponse.json({ media: buildMediaView(row) });
 }

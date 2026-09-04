@@ -1,5 +1,119 @@
 @import "tailwindcss";
 
+/* ---------------------------------------------------------------------------
+   Design tokens — two themes, no other brand colors.
+   Black mode (default) lives on :root; olive mode overrides on [data-theme].
+   ------------------------------------------------------------------------- */
+
+:root {
+  --bg: #000000;
+  --fg: #ffffff;
+  --muted: rgba(255, 255, 255, 0.62);
+  --line: rgba(255, 255, 255, 0.16);
+  --accent: #f5f54c; /* yellow — highlight / selected / interactive */
+  --accent-2: #677a04; /* olive — secondary accent */
+  --on-accent: #000000; /* text drawn on top of --accent */
+  color-scheme: dark;
+}
+
+html[data-theme="olive"] {
+  --bg: #677a04;
+  --fg: #ffffff;
+  --muted: rgba(255, 255, 255, 0.72);
+  --line: rgba(255, 255, 255, 0.26);
+  --accent: #000000; /* black replaces yellow as the primary accent */
+  --accent-2: #f5f54c; /* yellow all but disappears in this mode */
+  --on-accent: #ffffff;
+  color-scheme: dark;
+}
+
+/* Map tokens onto Tailwind utilities (inline so the vars above are consumed
+   directly and react to the data-theme switch at runtime). */
+@theme inline {
+  --color-bg: var(--bg);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-2: var(--accent-2);
+  --color-on-accent: var(--on-accent);
+}
+
+/* ---------------------------------------------------------------------------
+   Base
+   ------------------------------------------------------------------------- */
+
+html {
+  background-color: var(--bg);
+}
+
 body {
-  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  background-color: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-archivo), system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background-color: var(--accent);
+  color: var(--on-accent);
+}
+
+/* Editorial display helpers (used in addition to Tailwind utilities). */
+.font-display {
+  font-family: var(--font-archivo), system-ui, sans-serif;
+}
+
+.font-accent-serif {
+  font-family: var(--font-serif), Georgia, "Times New Roman", serif;
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+
+/* Numeric metadata reads as printed matter. */
+.mono-meta {
+  font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------------------------------------------------------------------
+   Theme switch transition — applied briefly while switching so the whole
+   page cross-fades its colors instead of snapping. Only color properties
+   are transitioned, and only while the .theme-transition class is present.
+   ------------------------------------------------------------------------- */
+
+html.theme-transition,
+html.theme-transition *,
+html.theme-transition *::before,
+html.theme-transition *::after {
+  transition:
+    background-color 500ms ease,
+    color 500ms ease,
+    border-color 500ms ease,
+    fill 500ms ease,
+    stroke 500ms ease,
+    box-shadow 500ms ease,
+    opacity 500ms ease !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.theme-transition,
+  html.theme-transition *,
+  html.theme-transition *::before,
+  html.theme-transition *::after {
+    transition: none !important;
+  }
+}
+
+/* Always respect reduced motion for long-lived animations. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

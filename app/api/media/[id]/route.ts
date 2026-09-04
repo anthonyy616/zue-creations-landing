@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { DeleteObjectsCommand } from "@aws-sdk/client-s3";
 import { db } from "@/lib/db";
 import { media, projects } from "@/db/schema";
 import { requireAdminSession } from "@/lib/session";
+import { revalidateMediaForProject } from "@/lib/revalidate";
 import { r2, R2_BUCKET_NAME } from "@/lib/r2";
 import { parseVariants } from "@/lib/media";
 
@@ -24,6 +24,7 @@ export async function DELETE(
       storageKey: media.storageKey,
       variants: media.variants,
       slug: projects.slug,
+      category: projects.category,
     })
     .from(media)
     .innerJoin(projects, eq(media.projectId, projects.id))
@@ -59,7 +60,7 @@ export async function DELETE(
   }
 
   await db.delete(media).where(eq(media.id, id));
-  revalidatePath(`/work/${row.slug}`);
+  revalidateMediaForProject(row.slug, row.category);
 
   return NextResponse.json({ ok: true });
 }
