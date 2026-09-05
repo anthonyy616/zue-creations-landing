@@ -6,26 +6,32 @@ import { buildMediaView, type MediaView } from "@/lib/media";
 
 export type ProjectCard = Project & { cover: MediaView | null };
 
+/** A project row plus every published media item, in display order. */
+export type ProjectWithMedia = Project & { media: MediaView[] };
+
 const MAX_HOME_PROJECTS = 6;
 
-/** First media item per project (images preferred over videos). */
-async function attachCovers(rows: Project[]): Promise<ProjectCard[]> {
-  if (rows.length === 0) return [];
-  const ids = rows.map((p) => p.id);
+/** All media rows for a set of project ids, grouped and ordered. */
+async function mediaByProject(ids: string[]): Promise<Map<string, MediaView[]>> {
+  const map = new Map<string, MediaView[]>();
+  if (ids.length === 0) return map;
   const mediaRows = await db
     .select()
     .from(media)
     .where(inArray(media.projectId, ids))
     .orderBy(asc(media.sortOrder), asc(media.createdAt));
-
-  const byProject = new Map<string, MediaView[]>();
   for (const row of mediaRows) {
-    const list = byProject.get(row.projectId);
+    const list = map.get(row.projectId);
     const view = buildMediaView(row);
     if (list) list.push(view);
-    else byProject.set(row.projectId, [view]);
+    else map.set(row.projectId, [view]);
   }
+  return map;
+}
 
+/** First media item per project (images preferred over videos). */
+async function attachCovers(rows: Project[]): Promise<ProjectCard[]> {
+  const byProject = await mediaByProject(rows.map((p) => p.id));
   return rows.map((project) => {
     const items = byProject.get(project.id);
     let cover: MediaView | null = null;
@@ -35,6 +41,22 @@ async function attachCovers(rows: Project[]): Promise<ProjectCard[]> {
     return { ...project, cover };
   });
 }
+
+/** All projects in a category, each with its complete media list. */
+export const getCategoryProjectsWithMedia = cache(
+  async (category: ProjectCategory): Promise<ProjectWithMedia[]> => {
+    const rows = await db
+      .select()
+      .from(projects)
+      .where(eq(projects.category, category))
+      .orderBy(asc(projects.sortOrder), desc(projects.date), desc(projects.createdAt));
+    const byProject = await mediaByProject(rows.map((p) => p.id));
+    return rows.map((project) => ({
+      ...project,
+      media: byProject.get(project.id) ?? [],
+    }));
+  }
+);
 
 /** Projects for the home "Selected work" list: featured first, then order/date. */
 export const getHomeProjects = cache(async (): Promise<ProjectCard[]> => {

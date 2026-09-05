@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getCategoryProjects } from "@/lib/public";
+import { getCategoryProjectsWithMedia } from "@/lib/public";
 import CategoryView from "@/components/site/category-view";
 
 export const revalidate = 60;
@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 };
 
 export default async function PhotographyPage() {
-  const projects = await getCategoryProjects("photography");
+  const projects = await getCategoryProjectsWithMedia("photography");
   return (
     <CategoryView
       title="Photography"

@@ -13,6 +13,10 @@
   --accent: #f5f54c; /* yellow — highlight / selected / interactive */
   --accent-2: #677a04; /* olive — secondary accent */
   --on-accent: #000000; /* text drawn on top of --accent */
+  --glow-rgb: 103 122 4; /* olive, for faint ambient gradients */
+  --aura-strong: rgba(103, 122, 4, 0.16);
+  --aura-mid: rgba(103, 122, 4, 0.1);
+  --aura-soft: rgba(103, 122, 4, 0.07);
   color-scheme: dark;
 }
 
@@ -24,6 +28,10 @@ html[data-theme="olive"] {
   --accent: #000000; /* black replaces yellow as the primary accent */
   --accent-2: #f5f54c; /* yellow all but disappears in this mode */
   --on-accent: #ffffff;
+  --glow-rgb: 0 0 0; /* depth glows on the olive ground */
+  --aura-strong: rgba(0, 0, 0, 0.14);
+  --aura-mid: rgba(0, 0, 0, 0.09);
+  --aura-soft: rgba(255, 255, 255, 0.05);
   color-scheme: dark;
 }
 
@@ -53,6 +61,63 @@ body {
   font-family: var(--font-archivo), system-ui, -apple-system, "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+}
+
+/* ---------------------------------------------------------------------------
+   Ambient background — faint olive washes breathed over the black ground.
+   Painted by the .bg-aura layer in the public layout; pointer-events none so
+   it never intercepts input. Colors come from tokens above so the theme
+   cross-fade covers the aura too.
+   ------------------------------------------------------------------------- */
+
+.bg-aura {
+  background-image:
+    radial-gradient(
+      52rem 38rem at 8% -6%,
+      var(--aura-strong),
+      transparent 62%
+    ),
+    radial-gradient(
+      46rem 32rem at 94% 4%,
+      var(--aura-mid),
+      transparent 60%
+    ),
+    radial-gradient(
+      70rem 50rem at 50% 112%,
+      var(--aura-soft),
+      transparent 68%
+    );
+}
+
+/* Quiet drift for display type — a slow breath so the words feel alive.
+   Applied to the per-line wrappers in the home hero; each line inherits a
+   stagger delay so the movement waves through the sentence one by one. */
+@keyframes line-drift {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  50% {
+    translate: 0 -0.055em;
+  }
+}
+
+.line-drift {
+  animation: line-drift 7s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .line-drift {
+    animation: none;
+  }
+}
+
+/* Only hover effects that rely on a pointing device should fire on hover; on
+   touch the same elements still get feedback from the active/tap state. */
+@media (hover: none) {
+  .hover-lift:active {
+    transform: translateY(0.045em);
+  }
 }
 
 ::selection {
@@ -116,4 +181,13 @@ html.theme-transition *::after {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* Hide the native scrollbar on horizontal media strips without losing scroll. */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }

@@ -1,18 +1,17 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import Image from "next/image";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
 import { ArrowLeft, ArrowUpRight } from "lucide-react";
 import InstagramIcon from "@/components/site/instagram-icon";
-import AutoplayVideo from "@/components/site/autoplay-video";
 import {
   getAllProjectSlugs,
   getPublicProject,
   getProjectMediaViews,
 } from "@/lib/public";
-import type { MediaView } from "@/lib/media";
-import { loaderSrc } from "@/lib/image-loader";
+import MediaScroller from "@/components/site/media-scroller";
+import { mediaToSlide } from "@/lib/media-slides";
+import { FadeUp } from "@/components/site/motion";
 import { CATEGORY_LABELS } from "@/components/site/work-list";
 
 export const revalidate = 60;
@@ -55,56 +54,6 @@ export async function generateMetadata({
   };
 }
 
-function GalleryMedia({ media, index }: { media: MediaView; index: number }) {
-  if (media.type === "video") {
-    return (
-      <figure>
-        <AutoplayVideo
-          src={media.url}
-          label={media.altText ?? "Project video"}
-          className="block max-h-[85vh] w-full bg-line object-contain"
-        />
-        {media.altText ? (
-          <figcaption className="mono-meta mt-3 text-[11px] uppercase tracking-[0.18em] text-muted">
-            {media.altText}
-          </figcaption>
-        ) : null}
-      </figure>
-    );
-  }
-
-  return (
-    <figure>
-      {media.width && media.height ? (
-        <Image
-          src={loaderSrc(media.originalUrl, media.variantWidths)}
-          alt={media.altText ?? ""}
-          width={media.width}
-          height={media.height}
-          sizes="(min-width: 1024px) 1056px, 100vw"
-          priority={index === 0}
-          fetchPriority={index === 0 ? "high" : "auto"}
-          className="h-auto w-full bg-line"
-        />
-      ) : (
-        // Variant generation failed — show the original file as-is.
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={media.url}
-          alt={media.altText ?? ""}
-          loading={index === 0 ? "eager" : "lazy"}
-          decoding="async"
-          className="block w-full bg-line"
-        />
-      )}
-      {media.altText ? (
-        <figcaption className="mono-meta mt-3 text-[11px] uppercase tracking-[0.18em] text-muted">
-          {media.altText}
-        </figcaption>
-      ) : null}
-    </figure>
-  );
-}
 
 export default async function WorkPage({ params }: { params: Promise<Params> }) {
   const { slug } = await params;
@@ -136,18 +85,22 @@ export default async function WorkPage({ params }: { params: Promise<Params> }) 
       {/* Title block */}
       <header className="border-b border-line">
         <div className="mx-auto max-w-6xl px-6 py-12 sm:py-16">
-          <p className="mono-meta text-[11px] uppercase tracking-[0.24em] text-accent">
-            {CATEGORY_LABELS[project.category]} · {year}
-            {project.location ? ` · ${project.location}` : ""}
-          </p>
-          <h1 className="font-display mt-6 max-w-5xl text-5xl font-black uppercase leading-[0.88] tracking-tight text-fg sm:text-7xl">
-            {project.title}
-          </h1>
+          <FadeUp>
+            <p className="mono-meta text-[11px] uppercase tracking-[0.24em] text-accent">
+              {CATEGORY_LABELS[project.category]} · {year}
+              {project.location ? ` · ${project.location}` : ""}
+            </p>
+            <h1 className="font-display mt-6 max-w-5xl text-5xl font-black uppercase leading-[0.88] tracking-tight text-fg sm:text-7xl">
+              {project.title}
+            </h1>
+          </FadeUp>
           <div className="mt-8 flex flex-col gap-8 sm:flex-row sm:items-end sm:justify-between">
             {project.description ? (
-              <p className="max-w-xl text-base leading-relaxed text-muted sm:text-lg">
-                {project.description}
-              </p>
+              <FadeUp delay={0.1} className="max-w-xl">
+                <p className="text-base leading-relaxed text-muted sm:text-lg">
+                  {project.description}
+                </p>
+              </FadeUp>
             ) : (
               <span />
             )}
@@ -166,18 +119,19 @@ export default async function WorkPage({ params }: { params: Promise<Params> }) 
         </div>
       </header>
 
-      {/* Media gallery */}
+      {/* Media gallery — swipe / scroll / drag between every frame. */}
       <div className="mx-auto max-w-6xl px-6 py-10">
         {mediaViews.length === 0 ? (
           <p className="border-y border-line py-16 text-center text-sm uppercase tracking-[0.2em] text-muted">
             No media published for this project yet.
           </p>
         ) : (
-          <div className="space-y-10">
-            {mediaViews.map((media, index) => (
-              <GalleryMedia key={media.id} media={media} index={index} />
-            ))}
-          </div>
+          <FadeUp>
+            <MediaScroller
+              slides={mediaViews.map((m) => mediaToSlide(m))}
+              mode="pages"
+            />
+          </FadeUp>
         )}
 
         {/* Bottom nav */}

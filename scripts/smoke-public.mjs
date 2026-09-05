@@ -108,13 +108,32 @@ try {
   const coverUrl = (await confirmRes.json()).media?.url;
   check("cover image uploaded", confirmRes.ok() && typeof coverUrl === "string");
 
+  // The project title can appear more than once on a page (film-rail chip +
+  // index row), so visibility is tested across all matches.
+  const titleVisible = () =>
+    page
+      .getByText(TITLE)
+      .evaluateAll((els) =>
+        els.some((el) => {
+          const r = el.getBoundingClientRect();
+          const s = getComputedStyle(el);
+          return (
+            r.width > 0 &&
+            r.height > 0 &&
+            s.display !== "none" &&
+            s.visibility !== "hidden"
+          );
+        })
+      )
+      .catch(() => false);
+
   // 4. The public home page shows the project (ISR on-demand revalidation).
   // ISR regenerates on the request *after* the revalidation is triggered, so
   // reload until the fresh markup arrives.
   let homeShows = false;
   for (let i = 0; i < 6; i++) {
     await page.goto(`${BASE_URL}/`);
-    const visible = await page.getByText(TITLE).isVisible().catch(() => false);
+    const visible = await titleVisible();
     if (visible) { homeShows = true; break; }
     await page.waitForTimeout(1500);
   }
@@ -126,7 +145,7 @@ try {
   let categoryShows = false;
   for (let i = 0; i < 6; i++) {
     await page.goto(`${BASE_URL}/photography`);
-    const visible = await page.getByText(TITLE).isVisible().catch(() => false);
+    const visible = await titleVisible();
     if (visible) { categoryShows = true; break; }
     await page.waitForTimeout(1500);
   }

@@ -50,8 +50,11 @@ function CoverMedia({ media }: { media: MediaView }) {
 /**
  * One editorial project row. Rows alternate media width/offset for an
  * asymmetric magazine rhythm rather than a uniform grid.
+ *
+ * ProjectRow renders just the content so callers can wrap it in their own
+ * <li> (e.g. an animated one). ProjectListRow is the ready-made bordered li.
  */
-export function ProjectListRow({
+export function ProjectRow({
   project,
   index,
 }: {
@@ -82,11 +85,10 @@ export function ProjectListRow({
   );
 
   return (
-    <li className="border-b border-line last:border-b-0">
-      <Link
-        href={`/work/${project.slug}`}
-        className="group grid gap-6 py-10 outline-none lg:grid-cols-12 lg:items-center lg:gap-x-6 focus-visible:ring-2 focus-visible:ring-accent"
-      >
+    <Link
+      href={`/work/${project.slug}`}
+      className="group grid gap-6 py-10 outline-none lg:grid-cols-12 lg:items-center lg:gap-x-6 focus-visible:ring-2 focus-visible:ring-accent"
+    >
         {/* Numeric index — a quiet running page number at the outer edge. */}
         <span
           aria-hidden="true"
@@ -126,7 +128,20 @@ export function ProjectListRow({
         >
           {meta}
         </div>
-      </Link>
+    </Link>
+  );
+}
+
+export function ProjectListRow({
+  project,
+  index,
+}: {
+  project: ProjectCard;
+  index: number;
+}) {
+  return (
+    <li className="border-b border-line last:border-b-0">
+      <ProjectRow project={project} index={index} />
     </li>
   );
 }

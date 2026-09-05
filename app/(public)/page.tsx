@@ -2,7 +2,14 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { ArrowDown, ArrowUpRight } from "lucide-react";
 import { getHomeProjects } from "@/lib/public";
-import { ProjectListRow, EmptyWork } from "@/components/site/work-list";
+import { ProjectRow, EmptyWork } from "@/components/site/work-list";
+import {
+  FadeUp,
+  PointerTilt,
+  RevealLine,
+  StaggerItem,
+  StaggerList,
+} from "@/components/site/motion";
 
 export const revalidate = 60;
 
@@ -42,15 +49,17 @@ export default async function HomePage() {
             <p className="mono-meta text-[11px] uppercase tracking-[0.24em] text-accent">
               Photography · Cinematography · Branding
             </p>
-            <h1 className="font-display mt-6 text-[13vw] font-black uppercase leading-[0.86] tracking-tight text-fg sm:text-7xl md:text-8xl">
-              Pictures
-              <br />
-              that feel like
-              <br />
-              <span className="font-accent-serif font-normal normal-case tracking-tight text-accent">
-                stories.
-              </span>
-            </h1>
+            <PointerTilt max={7} className="mt-6">
+              <h1 className="font-display text-[13vw] font-black uppercase leading-[0.86] tracking-tight text-fg sm:text-7xl md:text-8xl">
+                <RevealLine delay={0.05}>Pictures</RevealLine>
+                <RevealLine delay={0.18} driftDelay={0.7}>that feel like</RevealLine>
+                <RevealLine delay={0.31} driftDelay={1.4}>
+                  <span className="font-accent-serif font-normal normal-case tracking-tight text-accent">
+                    stories.
+                  </span>
+                </RevealLine>
+              </h1>
+            </PointerTilt>
           </div>
 
           <div className="flex flex-col justify-end gap-8 lg:col-span-4 lg:pb-2">
@@ -80,25 +89,32 @@ export default async function HomePage() {
       {/* Selected work                                                      */}
       {/* ------------------------------------------------------------------ */}
       <section id="work" className="mx-auto max-w-6xl scroll-mt-20 px-6">
-        <header className="flex items-end justify-between gap-6 pt-16">
-          <h2 className="font-display text-3xl font-black uppercase leading-none tracking-tight sm:text-4xl">
-            Selected<span className="text-accent"> work</span>
-          </h2>
-          <p className="mono-meta pb-1 text-[10px] uppercase tracking-[0.22em] text-muted">
-            {String(projects.length).padStart(2, "0")} projects
-          </p>
-        </header>
+        <FadeUp>
+          <header className="flex items-end justify-between gap-6 pt-16">
+            <h2 className="font-display text-3xl font-black uppercase leading-none tracking-tight sm:text-4xl">
+              Selected<span className="text-accent"> work</span>
+            </h2>
+            <p className="mono-meta pb-1 text-[10px] uppercase tracking-[0.22em] text-muted">
+              {String(projects.length).padStart(2, "0")} projects
+            </p>
+          </header>
+        </FadeUp>
 
         {projects.length === 0 ? (
           <div className="pt-8">
             <EmptyWork label="Selected work is coming soon." />
           </div>
         ) : (
-          <ul className="mt-4">
+          <StaggerList className="mt-4">
             {projects.map((project, index) => (
-              <ProjectListRow key={project.id} project={project} index={index} />
+              <StaggerItem
+                key={project.id}
+                className="border-b border-line last:border-b-0"
+              >
+                <ProjectRow project={project} index={index} />
+              </StaggerItem>
             ))}
-          </ul>
+          </StaggerList>
         )}
       </section>
 
@@ -106,17 +122,19 @@ export default async function HomePage() {
       {/* Discipline index — browse by work type                             */}
       {/* ------------------------------------------------------------------ */}
       <section className="mx-auto max-w-6xl px-6 pb-24">
-        <header className="pt-20">
-          <h2 className="font-display text-3xl font-black uppercase leading-none tracking-tight sm:text-4xl">
-            Browse by<span className="text-accent"> discipline</span>
-          </h2>
-        </header>
-        <ul className="mt-8 border-t border-line">
+        <FadeUp>
+          <header className="pt-20">
+            <h2 className="font-display text-3xl font-black uppercase leading-none tracking-tight sm:text-4xl">
+              Browse by<span className="text-accent"> discipline</span>
+            </h2>
+          </header>
+        </FadeUp>
+        <StaggerList className="mt-8 border-t border-line">
           {DISCIPLINES.map((d, index) => (
-            <li key={d.href} className="border-b border-line">
+            <StaggerItem key={d.href} className="border-b border-line">
               <Link
                 href={d.href}
-                className="group flex items-center justify-between gap-6 py-6 outline-none focus-visible:ring-2 focus-visible:ring-accent sm:py-8"
+                className="group flex items-center justify-between gap-6 py-6 outline-none focus-visible:ring-2 focus-visible:ring-accent active:translate-x-1 sm:py-8"
               >
                 <div className="flex items-baseline gap-5 sm:gap-8">
                   <span className="mono-meta hidden text-xs text-muted sm:block">
@@ -134,12 +152,12 @@ export default async function HomePage() {
                 <ArrowUpRight
                   size={28}
                   strokeWidth={1.25}
-                  className="shrink-0 text-muted transition-all duration-300 group-hover:translate-x-1 group-hover:-translate-y-1 group-hover:text-accent"
+                  className="shrink-0 text-muted transition-all duration-300 group-hover:translate-x-1 group-hover:-translate-y-1 group-hover:text-accent group-active:translate-y-0 group-active:text-accent"
                 />
               </Link>
-            </li>
+            </StaggerItem>
           ))}
-        </ul>
+        </StaggerList>
       </section>
 
       {/* ------------------------------------------------------------------ */}
@@ -147,14 +165,16 @@ export default async function HomePage() {
       {/* ------------------------------------------------------------------ */}
       <section className="border-t border-line">
         <div className="mx-auto flex max-w-6xl flex-col gap-8 px-6 py-20 sm:py-24 lg:flex-row lg:items-end lg:justify-between">
-          <h2 className="font-display max-w-3xl text-4xl font-black uppercase leading-[0.9] tracking-tight sm:text-6xl">
-            Have a story
-            <br />
-            <span className="font-accent-serif font-normal normal-case text-accent">
-              to tell?
-            </span>
-          </h2>
-          <div className="max-w-xs lg:text-right">
+          <FadeUp>
+            <h2 className="font-display max-w-3xl text-4xl font-black uppercase leading-[0.9] tracking-tight sm:text-6xl">
+              Have a story
+              <br />
+              <span className="font-accent-serif font-normal normal-case text-accent">
+                to tell?
+              </span>
+            </h2>
+          </FadeUp>
+          <FadeUp delay={0.15} className="max-w-xs lg:text-right">
             <p className="text-sm leading-relaxed text-muted">
               Tell me about the project — a form, a few questions, and the
               right package for the work.
@@ -165,7 +185,7 @@ export default async function HomePage() {
             >
               Start an enquiry <ArrowUpRight size={14} strokeWidth={1.5} />
             </Link>
-          </div>
+          </FadeUp>
         </div>
       </section>
     </div>
