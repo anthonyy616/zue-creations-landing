@@ -1,5 +1,6 @@
 import "dotenv/config";
 import bcrypt from "bcryptjs";
+import { eq } from "drizzle-orm";
 import { db } from "../lib/db";
 import { adminUsers } from "../db/schema";
 
@@ -11,8 +12,23 @@ async function main() {
   }
 
   const passwordHash = await bcrypt.hash(password, 12);
-  await db.insert(adminUsers).values({ email, passwordHash });
-  console.log(`Admin user created: ${email}`);
+
+  const existing = await db
+    .select({ id: adminUsers.id })
+    .from(adminUsers)
+    .where(eq(adminUsers.email, email))
+    .limit(1);
+
+  if (existing.length > 0) {
+    await db
+      .update(adminUsers)
+      .set({ passwordHash })
+      .where(eq(adminUsers.id, existing[0].id));
+    console.log(`Admin password updated: ${email}`);
+  } else {
+    await db.insert(adminUsers).values({ email, passwordHash });
+    console.log(`Admin user created: ${email}`);
+  }
 }
 
 main().catch((err) => {
