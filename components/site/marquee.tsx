@@ -1,11 +1,14 @@
-"use client";
-
-import { useReducedMotion } from "framer-motion";
-
 /**
  * A seamless horizontal marquee that loops text endlessly.
  * Pauses on hover, respects prefers-reduced-motion.
  * Used for editorial flavour strips between sections.
+ *
+ * Always renders the same DOM so there is no server/client hydration
+ * mismatch. Reduced-motion is handled purely in CSS (the keyframe is
+ * already disabled for prefers-reduced-motion in globals.css).
+ *
+ * This is a Server Component — all animation and hover behaviour is
+ * pure CSS (globals.css), so no client JS is needed.
  */
 export default function Marquee({
   text = "PHOTOGRAPHY · CINEMATOGRAPHY · CREATIVE DIRECTION ·",
@@ -17,24 +20,9 @@ export default function Marquee({
   speed?: number;
   className?: string;
 }) {
-  const reduced = useReducedMotion();
-
   // We duplicate the text enough times that the strip is always wider than the
   // viewport, then translate it by exactly one copy width for a seamless loop.
   const repeats = 6;
-
-  if (reduced) {
-    return (
-      <div
-        className={`overflow-hidden border-y border-line ${className}`}
-        aria-hidden="true"
-      >
-        <p className="py-4 text-center text-[11px] uppercase tracking-[0.24em] text-muted">
-          {text}
-        </p>
-      </div>
-    );
-  }
 
   return (
     <div
@@ -42,7 +30,7 @@ export default function Marquee({
       aria-hidden="true"
     >
       <div
-        className="marquee-inner flex w-max gap-x-0 will-change-transform"
+        className="marquee-inner flex w-max gap-x-0"
         style={{ animationDuration: `${speed}s` }}
       >
         {Array.from({ length: repeats }).map((_, i) => (
