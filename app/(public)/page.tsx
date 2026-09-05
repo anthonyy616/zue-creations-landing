@@ -10,6 +10,7 @@ import {
   StaggerItem,
   StaggerList,
 } from "@/components/site/motion";
+import Marquee from "@/components/site/marquee";
 
 export const revalidate = 60;
 
@@ -63,27 +64,39 @@ export default async function HomePage() {
           </div>
 
           <div className="flex flex-col justify-end gap-8 lg:col-span-4 lg:pb-2">
-            <p className="max-w-xs text-sm leading-relaxed text-muted">
-              An independent visual practice working across still and moving
-              image — selected projects, told one at a time.
-            </p>
-            <div className="flex flex-wrap items-center gap-6">
-              <Link
-                href="/enquire"
-                className="inline-flex items-center gap-2 border border-line px-5 py-3 text-[11px] font-medium uppercase tracking-[0.2em] text-fg transition-colors hover:border-accent hover:text-accent"
-              >
-                Start a project <ArrowUpRight size={14} strokeWidth={1.5} />
-              </Link>
-              <Link
-                href="#work"
-                className="inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-muted transition-colors hover:text-fg"
-              >
-                Selected work <ArrowDown size={14} strokeWidth={1.5} />
-              </Link>
-            </div>
+            <FadeUp delay={0.5}>
+              <p className="max-w-xs text-sm leading-relaxed text-muted">
+                An independent visual practice working across still and moving
+                image — selected projects, told one at a time.
+              </p>
+            </FadeUp>
+            <FadeUp delay={0.65}>
+              <div className="flex flex-wrap items-center gap-6">
+                <Link
+                  href="/enquire"
+                  className="group/btn inline-flex items-center gap-2 border border-line px-5 py-3 text-[11px] font-medium uppercase tracking-[0.2em] text-fg transition-all duration-300 hover:border-accent hover:text-accent hover:translate-x-1"
+                >
+                  Start a project <ArrowUpRight size={14} strokeWidth={1.5} className="transition-transform duration-300 group-hover/btn:translate-x-0.5 group-hover/btn:-translate-y-0.5" />
+                </Link>
+                <Link
+                  href="#work"
+                  className="group/link inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-muted transition-colors hover:text-fg"
+                >
+                  Selected work <ArrowDown size={14} strokeWidth={1.5} className="transition-transform duration-500 group-hover/link:translate-y-0.5" />
+                </Link>
+              </div>
+            </FadeUp>
           </div>
         </div>
       </section>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* Editorial strip                                                     */}
+      {/* ------------------------------------------------------------------ */}
+      <Marquee
+        text="PHOTOGRAPHY · CINEMATOGRAPHY · CREATIVE DIRECTION · VISUAL STORYTELLING ·"
+        speed={42}
+      />
 
       {/* ------------------------------------------------------------------ */}
       {/* Selected work                                                      */}
@@ -134,17 +147,17 @@ export default async function HomePage() {
             <StaggerItem key={d.href} className="border-b border-line">
               <Link
                 href={d.href}
-                className="group flex items-center justify-between gap-6 py-6 outline-none focus-visible:ring-2 focus-visible:ring-accent active:translate-x-1 sm:py-8"
+                className="group/disc flex items-center justify-between gap-6 py-6 outline-none focus-visible:ring-2 focus-visible:ring-accent active:translate-x-1 sm:py-8"
               >
                 <div className="flex items-baseline gap-5 sm:gap-8">
-                  <span className="mono-meta hidden text-xs text-muted sm:block">
+                  <span className="mono-meta hidden text-xs text-muted transition-colors duration-300 group-hover/disc:text-accent sm:block">
                     {String(index + 1).padStart(2, "0")}
                   </span>
                   <div>
-                    <span className="font-display block text-3xl font-black uppercase leading-none tracking-tight transition-transform duration-500 ease-out group-hover:translate-x-2 sm:text-5xl md:text-6xl">
+                    <span className="font-display block text-3xl font-black uppercase leading-none tracking-tight transition-all duration-500 ease-out group-hover/disc:translate-x-2 group-hover/disc:text-accent sm:text-5xl md:text-6xl">
                       {d.title}
                     </span>
-                    <span className="mt-2 hidden max-w-md text-sm text-muted sm:block">
+                    <span className="mt-2 hidden max-w-md text-sm text-muted transition-colors duration-300 group-hover/disc:text-fg/70 sm:block">
                       {d.blurb}
                     </span>
                   </div>
@@ -152,7 +165,7 @@ export default async function HomePage() {
                 <ArrowUpRight
                   size={28}
                   strokeWidth={1.25}
-                  className="shrink-0 text-muted transition-all duration-300 group-hover:translate-x-1 group-hover:-translate-y-1 group-hover:text-accent group-active:translate-y-0 group-active:text-accent"
+                  className="shrink-0 text-muted transition-all duration-300 group-hover/disc:translate-x-1 group-hover/disc:-translate-y-1 group-hover/disc:text-accent group-active:translate-y-0 group-active:text-accent"
                 />
               </Link>
             </StaggerItem>

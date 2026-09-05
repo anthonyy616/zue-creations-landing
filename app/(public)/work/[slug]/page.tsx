@@ -11,7 +11,7 @@ import {
 } from "@/lib/public";
 import MediaScroller from "@/components/site/media-scroller";
 import { mediaToSlide } from "@/lib/media-slides";
-import { FadeUp } from "@/components/site/motion";
+import { FadeUp, StaggerItem, StaggerList } from "@/components/site/motion";
 import { CATEGORY_LABELS } from "@/components/site/work-list";
 
 export const revalidate = 60;
@@ -96,7 +96,7 @@ export default async function WorkPage({ params }: { params: Promise<Params> }) 
           </FadeUp>
           <div className="mt-8 flex flex-col gap-8 sm:flex-row sm:items-end sm:justify-between">
             {project.description ? (
-              <FadeUp delay={0.1} className="max-w-xl">
+              <FadeUp delay={0.12} className="max-w-xl">
                 <p className="text-base leading-relaxed text-muted sm:text-lg">
                   {project.description}
                 </p>
@@ -105,15 +105,17 @@ export default async function WorkPage({ params }: { params: Promise<Params> }) 
               <span />
             )}
             {project.instagramUrl ? (
-              <a
-                href={project.instagramUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex w-fit items-center gap-2 border border-line px-4 py-2 text-[11px] uppercase tracking-[0.18em] text-fg transition-colors hover:border-accent hover:text-accent"
-              >
-                <InstagramIcon size={14} strokeWidth={1.5} />
-                View on Instagram <ArrowUpRight size={13} strokeWidth={1.5} />
-              </a>
+              <FadeUp delay={0.2}>
+                <a
+                  href={project.instagramUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="group/ig inline-flex w-fit items-center gap-2 border border-line px-4 py-2 text-[11px] uppercase tracking-[0.18em] text-fg transition-all duration-300 hover:border-accent hover:text-accent hover:translate-x-1"
+                >
+                  <InstagramIcon size={14} strokeWidth={1.5} />
+                  View on Instagram <ArrowUpRight size={13} strokeWidth={1.5} className="transition-transform duration-300 group-hover/ig:translate-x-0.5 group-hover/ig:-translate-y-0.5" />
+                </a>
+              </FadeUp>
             ) : null}
           </div>
         </div>

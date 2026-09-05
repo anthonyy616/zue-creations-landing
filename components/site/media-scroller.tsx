@@ -378,7 +378,7 @@ export default function MediaScroller({
                   ref={slideRef}
                   className="flex w-full shrink-0 snap-start flex-col"
                 >
-                  <div className="relative flex h-[clamp(300px,58vh,640px)] w-full select-none items-center justify-center overflow-hidden bg-white/[0.04]">
+                  <div className="relative flex h-[clamp(300px,58vh,640px)] w-full select-none items-center justify-center overflow-hidden bg-white/[0.04] transition-transform duration-700 ease-out hover:scale-[1.02]">
                     {slide.kind === "video" ? (
                       <AutoplayVideo
                         src={slide.src}
@@ -392,7 +392,7 @@ export default function MediaScroller({
                         alt={slide.alt ?? ""}
                         loading={i === 0 ? "eager" : "lazy"}
                         decoding="async"
-                        className="max-h-full w-auto max-w-full object-contain"
+                        className="max-h-full w-auto max-w-full object-contain transition-transform duration-700 ease-out group-hover:scale-[1.03]"
                       />
                     ) : (
                       <Image
@@ -401,7 +401,7 @@ export default function MediaScroller({
                         fill
                         priority={i === 0}
                         sizes="100vw"
-                        className="object-contain"
+                        className="object-contain transition-transform duration-700 ease-out group-hover:scale-[1.03]"
                       />
                     )}
                   </div>
@@ -419,14 +419,14 @@ export default function MediaScroller({
               <div className="relative aspect-[4/3] h-full w-full select-none overflow-hidden bg-white/[0.04]">
                 <TileMedia slide={slide} mode={mode} eager={i === 0} />
                 {slide.label ? (
-                  <span className="pointer-events-none absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 bg-gradient-to-t from-black/70 via-black/25 to-transparent p-3 pt-10 sm:p-4">
+                  <span className="pointer-events-none absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 bg-gradient-to-t from-black/70 via-black/25 to-transparent p-3 pt-10 transition-opacity duration-500 sm:p-4">
                     <span className="font-display text-[13px] font-bold uppercase tracking-tight text-white">
                       {slide.label}
                     </span>
                     <ChevronRight
                       size={16}
                       strokeWidth={1.5}
-                      className="shrink-0 text-white/80 transition-transform duration-300 group-hover:translate-x-1 group-hover:text-accent"
+                      className="shrink-0 text-white/80 transition-all duration-300 group-hover:translate-x-1.5 group-hover:text-accent group-hover:opacity-100 opacity-70"
                     />
                   </span>
                 ) : null}

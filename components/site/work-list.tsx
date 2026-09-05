@@ -87,6 +87,7 @@ export function ProjectRow({
   return (
     <Link
       href={`/work/${project.slug}`}
+      data-cursor="view"
       className="group grid gap-6 py-10 outline-none lg:grid-cols-12 lg:items-center lg:gap-x-6 focus-visible:ring-2 focus-visible:ring-accent"
     >
         {/* Numeric index — a quiet running page number at the outer edge. */}
@@ -117,6 +118,13 @@ export function ProjectRow({
               </span>
             </div>
           )}
+          {/* Subtle editorial number overlay */}
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute right-4 bottom-4 text-[10px] font-bold tracking-[0.2em] text-fg/20 transition-colors duration-500 group-hover:text-accent/40"
+          >
+            {number}
+          </span>
         </div>
 
         <div

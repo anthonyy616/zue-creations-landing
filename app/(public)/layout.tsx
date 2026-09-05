@@ -1,6 +1,7 @@
 import SiteHeader from "@/components/site/site-header";
 import SiteFooter from "@/components/site/site-footer";
 import PageTransition from "@/components/site/page-transition";
+import CustomCursor from "@/components/site/custom-cursor";
 
 export default function PublicLayout({
   children,
@@ -9,6 +10,7 @@ export default function PublicLayout({
 }) {
   return (
     <div className="relative bg-bg text-fg">
+      <CustomCursor />
       {/* Ambient olive gradient wash behind everything. */}
       <div
         aria-hidden="true"

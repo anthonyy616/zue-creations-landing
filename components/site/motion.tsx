@@ -1,7 +1,7 @@
 "use client";
 
-import { motion, useReducedMotion } from "framer-motion";
-import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import { motion, useMotionValue, useReducedMotion, useSpring } from "framer-motion";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
@@ -181,6 +181,111 @@ export function PointerTilt({
       >
         {children}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Magnetic pull — the child drifts 3-8 px toward the cursor on hover.
+ * Good for CTAs, nav links, social icons. Touch / reduced-motion get the
+ * child straight, no drift.
+ */
+export function Magnetic({
+  children,
+  className = "",
+  max = 6,
+}: {
+  children: ReactNode;
+  className?: string;
+  max?: number;
+}) {
+  const reduced = useReducedMotion();
+  const ref = useRef<HTMLDivElement>(null);
+  const [enabled, setEnabled] = useState(false);
+  const x = useMotionValue(0);
+  const y = useMotionValue(0);
+  const sx = useSpring(x, { stiffness: 250, damping: 18, mass: 0.5 });
+  const sy = useSpring(y, { stiffness: 250, damping: 18, mass: 0.5 });
+
+  useEffect(() => {
+    setEnabled(window.matchMedia("(hover: hover)").matches);
+  }, []);
+
+  const onMove = (e: React.PointerEvent) => {
+    const el = ref.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const nx = ((e.clientX - rect.left) / rect.width - 0.5) * 2;
+    const ny = ((e.clientY - rect.top) / rect.height - 0.5) * 2;
+    x.set(nx * max);
+    y.set(ny * max);
+  };
+
+  const onLeave = () => {
+    x.set(0);
+    y.set(0);
+  };
+
+  if (reduced || !enabled) return <div className={className}>{children}</div>;
+
+  return (
+    <div
+      ref={ref}
+      className={className}
+      onPointerMove={onMove}
+      onPointerLeave={onLeave}
+    >
+      <motion.div style={{ x: sx, y: sy }}>
+        {children}
+      </motion.div>
+    </div>
+  );
+}
+
+/**
+ * Image that follows the pointer with subtle parallax displacement.
+ * Used inside project cards for a depth effect.
+ */
+export function ImageParallax({
+  children,
+  className = "",
+  max = 12,
+}: {
+  children: ReactNode;
+  className?: string;
+  max?: number;
+}) {
+  const reduced = useReducedMotion();
+  const [enabled, setEnabled] = useState(false);
+  const x = useMotionValue(0);
+  const y = useMotionValue(0);
+  const sx = useSpring(x, { stiffness: 200, damping: 22, mass: 0.6 });
+  const sy = useSpring(y, { stiffness: 200, damping: 22, mass: 0.6 });
+
+  useEffect(() => {
+    setEnabled(window.matchMedia("(hover: hover)").matches);
+  }, []);
+
+  if (reduced || !enabled) return <div className={className}>{children}</div>;
+
+  return (
+    <div
+      className={`overflow-hidden ${className}`}
+      onPointerMove={(e) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        const nx = ((e.clientX - rect.left) / rect.width - 0.5) * 2;
+        const ny = ((e.clientY - rect.top) / rect.height - 0.5) * 2;
+        x.set(nx * max);
+        y.set(ny * max);
+      }}
+      onPointerLeave={() => {
+        x.set(0);
+        y.set(0);
+      }}
+    >
+      <motion.div style={{ x: sx, y: sy }} className="size-full">
+        {children}
+      </motion.div>
     </div>
   );
 }
