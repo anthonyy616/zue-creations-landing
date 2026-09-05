@@ -47,6 +47,12 @@ try {
   await page.getByRole("button", { name: "Log in" }).click();
   await page.waitForURL(/\/admin\/dashboard/);
   check("valid login reaches /admin/dashboard", true);
+  const dashText = await page.evaluate(() => document.body.innerText);
+  check(
+    "dashboard shows stats + New project CTA",
+    /total projects/i.test(dashText) && dashText.includes("New project"),
+    "content missing"
+  );
 
   // 4. Create a project via the inline form.
   const slug = `smoke-${Date.now()}`;
