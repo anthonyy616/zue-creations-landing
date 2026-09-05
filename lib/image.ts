@@ -11,27 +11,48 @@ export interface Variant {
   height: number;
   /** Object key of the WebP file, stored in the media row. */
   webpKey: string;
-  /** Object key of the JPEG fallback, stored in the media row. */
-  jpegKey: string;
+  /** Object key of the AVIF file, stored in the media row. */
+  avifKey: string;
 }
 
 export type VariantMap = { sm: Variant | null; md: Variant | null; lg: Variant | null };
 
 /**
- * Deterministic variant key for an original key: <base-without-ext>-<width>.webp.
+ * Deterministic variant key for an original key: <base-without-ext>-<width>.webp|avif.
  * Phase 6's next/image loader derives variant URLs from this pattern, so it
  * must never change without updating the loader.
  */
-export function variantKey(storageKey: string, width: number, format: "webp" | "jpeg"): string {
+export function variantKey(
+  storageKey: string,
+  width: number,
+  format: "webp" | "avif"
+): string {
   const dot = storageKey.lastIndexOf(".");
   const base = dot === -1 ? storageKey : storageKey.slice(0, dot);
-  return `${base}-${width}.${format === "webp" ? "webp" : "jpg"}`;
+  return `${base}-${width}.${format}`;
 }
 
 /**
- * Fetches the original from R2, generates <480/960/1920>px variants in WebP and
- * JPEG (never upscaling), uploads them back to R2, and returns the variant map
- * plus the original's dimensions.
+ * Generates a tiny blurred placeholder (LQIP) synchronously and cheaply —
+ * a ~20px-wide, heavily-compressed WebP thumbnail, base64 inlined as a data
+ * URL. Small enough to store directly in the DB row (no R2 round-trip).
+ * Near-instant even on large originals.
+ */
+export async function generateLQIP(storageKey: string): Promise<string> {
+  const originalBuffer = await sharpBufferFromR2(storageKey);
+  const buf = await sharp(originalBuffer)
+    .resize({ width: 20, withoutEnlargement: true })
+    .webp({ quality: 20 })
+    .toBuffer();
+  return `data:image/webp;base64,${buf.toString("base64")}`;
+}
+
+/**
+ * Fetches the original from R2, generates <480/960/1920>px variants in WebP
+ * and AVIF (never upscaling), uploads them back to R2, and returns the
+ * variant map plus the original's dimensions.
+ *
+ * Widths are processed in parallel for maximum throughput.
  */
 export async function generateImageVariants(
   storageKey: string
@@ -46,52 +67,53 @@ export async function generateImageVariants(
   const variants: VariantMap = { sm: null, md: null, lg: null };
   const nameByWidth: Record<number, keyof VariantMap> = { 480: "sm", 960: "md", 1920: "lg" };
 
-  for (const width of effectiveWidths) {
-    const baseImage = sharp(originalBuffer).resize({
-      width,
-      withoutEnlargement: true,
-    });
+  // Process all widths in parallel (not sequentially).
+  await Promise.all(
+    effectiveWidths.map(async (width) => {
+      const baseImage = sharp(originalBuffer).resize({
+        width,
+        withoutEnlargement: true,
+      });
 
-    const webpKey = variantKey(storageKey, width, "webp");
-    const jpegKey = variantKey(storageKey, width, "jpeg");
+      const webpKey = variantKey(storageKey, width, "webp");
+      const avifKey = variantKey(storageKey, width, "avif");
 
-    // resolveWithObject gives the *output* dimensions of the resized image
-    // (metadata() would report the original's instead).
-    const [webpResult, jpegBuffer] = await Promise.all([
-      baseImage.clone().webp({ quality: 78 }).toBuffer({ resolveWithObject: true }),
-      baseImage.clone().jpeg({ quality: 82, mozjpeg: true }).toBuffer(),
-    ]);
-    const webpBuffer = webpResult.data;
-    const resizedHeight = webpResult.info.height;
+      const [webpResult, avifResult] = await Promise.all([
+        baseImage.clone().webp({ quality: 78 }).toBuffer({ resolveWithObject: true }),
+        baseImage.clone().avif({ quality: 50 }).toBuffer({ resolveWithObject: true }),
+      ]);
 
-    await Promise.all([
-      r2.send(
-        new PutObjectCommand({
-          Bucket: R2_BUCKET_NAME,
-          Key: webpKey,
-          Body: webpBuffer,
-          ContentType: "image/webp",
-          CacheControl: "public, max-age=31536000, immutable",
-        })
-      ),
-      r2.send(
-        new PutObjectCommand({
-          Bucket: R2_BUCKET_NAME,
-          Key: jpegKey,
-          Body: jpegBuffer,
-          ContentType: "image/jpeg",
-          CacheControl: "public, max-age=31536000, immutable",
-        })
-      ),
-    ]);
+      const resizedHeight = webpResult.info.height;
 
-    variants[nameByWidth[width]] = {
-      width,
-      height: resizedHeight,
-      webpKey,
-      jpegKey,
-    };
-  }
+      await Promise.all([
+        r2.send(
+          new PutObjectCommand({
+            Bucket: R2_BUCKET_NAME,
+            Key: webpKey,
+            Body: webpResult.data,
+            ContentType: "image/webp",
+            CacheControl: "public, max-age=31536000, immutable",
+          })
+        ),
+        r2.send(
+          new PutObjectCommand({
+            Bucket: R2_BUCKET_NAME,
+            Key: avifKey,
+            Body: avifResult.data,
+            ContentType: "image/avif",
+            CacheControl: "public, max-age=31536000, immutable",
+          })
+        ),
+      ]);
+
+      variants[nameByWidth[width]] = {
+        width,
+        height: resizedHeight,
+        webpKey,
+        avifKey,
+      };
+    })
+  );
 
   return { variants, width: metadata.width ?? null, height: metadata.height ?? null };
 }

@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
+import { after } from "next/server";
 import { eq, max } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { media, projects, mediaTypeEnum } from "@/db/schema";
 import { requireAdminSession } from "@/lib/session";
 import { revalidateMediaForProject } from "@/lib/revalidate";
-import { generateImageVariants } from "@/lib/image";
+import { generateImageVariants, generateLQIP } from "@/lib/image";
 import { buildMediaView } from "@/lib/media";
 
 const confirmSchema = z.object({
@@ -52,38 +53,65 @@ export async function POST(request: Request) {
     .where(eq(media.projectId, projectId));
   const sortOrder = (nextOrder?.value ?? -1) + 1;
 
-  let width: number | null = null;
-  let height: number | null = null;
-  let variantsJson: string | null = null;
-
+  // --- LQIP: generate synchronously (near-instant, ~20px thumbnail) ---
+  let lqipDataUrl: string | null = null;
   if (type === "image") {
     try {
-      const result = await generateImageVariants(key);
-      width = result.width;
-      height = result.height;
-      variantsJson = JSON.stringify(result.variants);
+      lqipDataUrl = await generateLQIP(key);
     } catch (err) {
-      console.error("Variant generation failed", err);
-      // Original is stored regardless; variants stay null so the original
-      // URL is used everywhere.
+      console.error("LQIP generation failed (non-fatal)", err);
+      // LQIP failure is non-fatal — we still insert the row.
     }
   }
 
+  // --- Insert the row immediately with status: "processing" ---
   const [row] = await db
     .insert(media)
     .values({
       projectId,
       type,
       storageKey: key,
-      variants: variantsJson,
+      variants: null,
       sortOrder,
       fileSizeBytes: fileSizeBytes ?? null,
-      width,
-      height,
+      width: null,
+      height: null,
+      status: type === "image" ? "processing" : "ready",
+      lqipDataUrl,
     })
     .returning();
 
   revalidateMediaForProject(project[0].slug, project[0].category);
+
+  // --- Kick off variant generation AFTER the response is sent ---
+  if (type === "image") {
+    after(async () => {
+      try {
+        const result = await generateImageVariants(key);
+        await db
+          .update(media)
+          .set({
+            width: result.width,
+            height: result.height,
+            variants: JSON.stringify(result.variants),
+            status: "ready",
+          })
+          .where(eq(media.id, row.id));
+
+        revalidateMediaForProject(project[0].slug, project[0].category);
+      } catch (err) {
+        console.error("Variant generation failed", err);
+        // Mark as failed so the admin can retry — never silently serve the
+        // original as a permanent fallback.
+        await db
+          .update(media)
+          .set({ status: "failed" })
+          .where(eq(media.id, row.id));
+
+        revalidateMediaForProject(project[0].slug, project[0].category);
+      }
+    });
+  }
 
   return NextResponse.json({ media: buildMediaView(row) });
 }

@@ -23,17 +23,23 @@ function CoverMedia({ media }: { media: MediaView }) {
       />
     );
   }
-  if (!media.width || !media.height) {
-    // Variant generation failed for this image — fall back to the original.
+  if (media.status !== "ready" || !media.width || !media.height) {
+    // While processing or on failure, show the LQIP placeholder — never
+    // the raw original which can be up to 50 MB.
+    if (media.lqipDataUrl) {
+      return (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={media.lqipDataUrl}
+          alt={media.altText ?? ""}
+          loading="lazy"
+          decoding="async"
+          className="h-full w-full object-cover blur-sm scale-110"
+        />
+      );
+    }
     return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={media.url}
-        alt={media.altText ?? ""}
-        loading="lazy"
-        decoding="async"
-        className="h-full w-full object-cover"
-      />
+      <div className="h-full w-full bg-white/[0.04]" />
     );
   }
   return (

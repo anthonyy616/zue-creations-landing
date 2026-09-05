@@ -35,17 +35,24 @@ function TileMedia({
       />
     );
   }
-  if (slide.variantWidths.length === 0) {
-    // No generated variants — the original file is the only option.
+  // While processing or on failure, show the LQIP placeholder — never the
+  // raw original which can be up to 50 MB.
+  if (slide.status !== "ready" || slide.variantWidths.length === 0) {
+    if (slide.lqipDataUrl) {
+      return (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={slide.lqipDataUrl}
+          alt={slide.alt ?? ""}
+          loading={eager ? "eager" : "lazy"}
+          decoding="async"
+          className="h-full w-full object-cover blur-sm scale-110"
+        />
+      );
+    }
+    // No LQIP available either — show a subtle placeholder.
     return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={slide.src}
-        alt={slide.alt ?? ""}
-        loading={eager ? "eager" : "lazy"}
-        decoding="async"
-        className="h-full w-full object-cover"
-      />
+      <div className="h-full w-full bg-white/[0.04]" />
     );
   }
   return (
@@ -385,15 +392,19 @@ export default function MediaScroller({
                         label={slide.alt ?? slide.label ?? "Video"}
                         className="h-full w-full object-contain"
                       />
-                    ) : slide.variantWidths.length === 0 ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={slide.src}
-                        alt={slide.alt ?? ""}
-                        loading={i === 0 ? "eager" : "lazy"}
-                        decoding="async"
-                        className="max-h-full w-auto max-w-full object-contain transition-transform duration-700 ease-out group-hover:scale-[1.03]"
-                      />
+                    ) : slide.status !== "ready" || slide.variantWidths.length === 0 ? (
+                      slide.lqipDataUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={slide.lqipDataUrl}
+                          alt={slide.alt ?? ""}
+                          loading={i === 0 ? "eager" : "lazy"}
+                          decoding="async"
+                          className="max-h-full w-auto max-w-full object-contain blur-sm scale-110 transition-transform duration-700 ease-out group-hover:scale-[1.03]"
+                        />
+                      ) : (
+                        <div className="max-h-full w-auto max-w-full bg-white/[0.04]" />
+                      )
                     ) : (
                       <Image
                         src={loaderSrc(slide.originalUrl, slide.variantWidths)}

@@ -21,7 +21,7 @@ export default function PageTransition({
 
   return (
     <MotionConfig reducedMotion="user">
-      <AnimatePresence mode="wait" initial={false}>
+      <AnimatePresence mode="popLayout" initial={false}>
         <motion.div
           key={pathname}
           initial={{ opacity: 0, y: 10 }}

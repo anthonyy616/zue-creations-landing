@@ -2,7 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { GripVertical, Trash2, UploadCloud } from "lucide-react";
+import { GripVertical, Trash2, UploadCloud, RefreshCw, Loader2 } from "lucide-react";
 import {
   DndContext,
   closestCenter,
@@ -24,6 +24,8 @@ import type { MediaView } from "@/lib/media";
 import { reorderMedia } from "./media-actions";
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
+/** Max files to presign+PUT in parallel (avoids saturating the browser). */
+const UPLOAD_CONCURRENCY = 4;
 
 type Status = { fileName: string; progress: number } | null;
 
@@ -31,10 +33,14 @@ function SortableMediaItem({
   item,
   onDelete,
   deleting,
+  onRetry,
+  retrying,
 }: {
   item: MediaView;
   onDelete: (id: string) => void;
   deleting: boolean;
+  onRetry: (id: string) => void;
+  retrying: boolean;
 }) {
   const {
     attributes,
@@ -74,7 +80,13 @@ function SortableMediaItem({
         <p className="truncate text-xs uppercase tracking-wide text-zinc-400">
           {item.type}
         </p>
-        {item.width && item.height ? (
+        {item.status === "processing" ? (
+          <p className="flex items-center gap-1 text-xs text-amber-400">
+            <Loader2 size={11} className="animate-spin" /> Processing…
+          </p>
+        ) : item.status === "failed" ? (
+          <p className="text-xs text-red-400">Variant generation failed</p>
+        ) : item.width && item.height ? (
           <p className="text-xs text-zinc-600">
             {item.width}×{item.height}
             {item.fileSizeBytes
@@ -83,6 +95,17 @@ function SortableMediaItem({
           </p>
         ) : null}
       </div>
+      {item.status === "failed" ? (
+        <button
+          type="button"
+          onClick={() => onRetry(item.id)}
+          disabled={retrying}
+          aria-label="Retry variant generation"
+          className="rounded p-2 text-zinc-600 hover:bg-amber-500/10 hover:text-amber-400 disabled:opacity-40"
+        >
+          <RefreshCw size={16} />
+        </button>
+      ) : null}
       <button
         type="button"
         onClick={() => onDelete(item.id)}
@@ -108,6 +131,7 @@ export default function MediaManager({
   const [status, setStatus] = useState<Status>(null);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [retryingId, setRetryingId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const sensors = useSensors(
@@ -184,29 +208,87 @@ export default function MediaManager({
     });
   }, []);
 
+  /**
+   * Upload a single file through the full presign→PUT→confirm pipeline.
+   * Confirm now returns instantly (P0 #2), so this is fast.
+   */
+  const uploadOne = useCallback(
+    async (file: File): Promise<MediaView> => {
+      const { uploadUrl, key } = await presign(file);
+      await putToR2(file, uploadUrl);
+      return confirm(file, key);
+    },
+    [presign, putToR2, confirm]
+  );
+
+  /**
+   * Process files with bounded concurrency. Presign+PUT happens in parallel
+   * across files (up to UPLOAD_CONCURRENCY at a time) so the browser
+   * saturates the network instead of uploading one file at a time.
+   */
   async function handleFiles(files: FileList | File[]) {
     setError(null);
-    const list = Array.from(files);
-    for (const file of list) {
+    const list = Array.from(files).filter((file) => {
       if (file.size > MAX_FILE_SIZE) {
         setError(`${file.name} exceeds the 50 MB limit and was skipped.`);
-        continue;
+        return false;
       }
       if (!/^(image|video)\//.test(file.type)) {
         setError(`${file.name} is not an image or video and was skipped.`);
-        continue;
+        return false;
       }
-      setStatus({ fileName: file.name, progress: 0 });
-      try {
-        const { uploadUrl, key } = await presign(file);
-        await putToR2(file, uploadUrl);
-        const view = await confirm(file, key);
-        setItems((prev) => [...prev, view]);
-        setStatus(null);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Upload failed");
-        setStatus(null);
+      return true;
+    });
+
+    if (list.length === 0) return;
+
+    setStatus({ fileName: `${list.length} file${list.length > 1 ? "s" : ""}…`, progress: 0 });
+
+    // Process files with bounded concurrency.
+    const results: MediaView[] = [];
+    let nextIdx = 0;
+
+    async function worker() {
+      while (nextIdx < list.length) {
+        const idx = nextIdx++;
+        const file = list[idx];
+        try {
+          const view = await uploadOne(file);
+          results.push(view);
+        } catch (err) {
+          setError(err instanceof Error ? err.message : `Upload failed for ${file.name}`);
+        }
       }
+    }
+
+    const concurrency = Math.min(UPLOAD_CONCURRENCY, list.length);
+    await Promise.all(Array.from({ length: concurrency }, () => worker()));
+
+    // Batch-update state once instead of per-file.
+    if (results.length > 0) {
+      setItems((prev) => [...prev, ...results]);
+    }
+    setStatus(null);
+  }
+
+  async function handleRetry(id: string) {
+    setRetryingId(id);
+    try {
+      const res = await fetch("/api/media/retry", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mediaId: id }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? "Retry failed");
+      }
+      const data = (await res.json()) as { media: MediaView };
+      setItems((prev) => prev.map((m) => (m.id === id ? data.media : m)));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Retry failed");
+    } finally {
+      setRetryingId(null);
     }
   }
 
@@ -319,6 +401,8 @@ export default function MediaManager({
                   item={item}
                   onDelete={handleDelete}
                   deleting={deletingId === item.id}
+                  onRetry={handleRetry}
+                  retrying={retryingId === item.id}
                 />
               ))}
             </ul>

@@ -31,7 +31,7 @@ export function getMediaObjectKeys(
   if (parsed) {
     for (const entry of Object.values(parsed)) {
       if (!entry) continue;
-      objects.push({ Key: entry.webpKey }, { Key: entry.jpegKey });
+      objects.push({ Key: entry.webpKey }, { Key: entry.avifKey });
     }
   }
   return objects;
@@ -57,11 +57,16 @@ export type MediaView = {
   fileSizeBytes: number | null;
   altText: string | null;
   sortOrder: number;
+  /** Processing status: "processing" | "ready" | "failed". */
+  status: "processing" | "ready" | "failed";
+  /** Inline base64 data URL for a tiny blurred placeholder. */
+  lqipDataUrl: string | null;
 };
 
 /** Builds a client-friendly view with an absolute display URL resolved from stored keys. */
 export function buildMediaView(row: Media): MediaView {
   const originalUrl = publicMediaUrl(row.storageKey);
+  const status = (row.status as MediaView["status"]) ?? "ready";
 
   if (row.type === "video") {
     const view: MediaView = {
@@ -75,6 +80,8 @@ export function buildMediaView(row: Media): MediaView {
       fileSizeBytes: row.fileSizeBytes,
       altText: row.altText,
       sortOrder: row.sortOrder ?? 0,
+      status,
+      lqipDataUrl: row.lqipDataUrl ?? null,
     };
     return view;
   }
@@ -99,6 +106,8 @@ export function buildMediaView(row: Media): MediaView {
     fileSizeBytes: row.fileSizeBytes,
     altText: row.altText,
     sortOrder: row.sortOrder ?? 0,
+    status,
+    lqipDataUrl: row.lqipDataUrl ?? null,
   };
   return view;
 }

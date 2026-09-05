@@ -10,6 +10,8 @@ import {
   index,
 } from "drizzle-orm/pg-core";
 
+export const mediaStatusEnum = pgEnum("media_status", ["processing", "ready", "failed"]);
+
 export const categoryEnum = pgEnum("category", [
   "photography",
   "cinematography",
@@ -55,6 +57,8 @@ export const media = pgTable(
     fileSizeBytes: integer("file_size_bytes"),
     width: integer("width"),
     height: integer("height"),
+    status: mediaStatusEnum("status").default("processing").notNull(),
+    lqipDataUrl: text("lqip_data_url"),
     createdAt: timestamp("created_at").defaultNow(),
   },
   (table) => [index("media_project_id_idx").on(table.projectId)]

@@ -19,6 +19,10 @@ export type MediaSlide = {
   label?: string | null;
   /** Where clicking a rail tile navigates. */
   href?: string;
+  /** Processing status: "processing" | "ready" | "failed". */
+  status: "processing" | "ready" | "failed";
+  /** Inline base64 data URL for a tiny blurred placeholder. */
+  lqipDataUrl: string | null;
 };
 
 /** Builds a serializable slide from a MediaView, optionally tagged with its project. */
@@ -35,5 +39,7 @@ export function mediaToSlide(
     alt: media.altText,
     label: meta?.label,
     href: meta?.href,
+    status: media.status,
+    lqipDataUrl: media.lqipDataUrl,
   };
 }

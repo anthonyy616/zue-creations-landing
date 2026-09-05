@@ -8,6 +8,13 @@
       "when": 1788549832962,
       "tag": "0000_military_dakota_north",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1788640000000,
+      "tag": "0001_add_media_status_lqip",
+      "breakpoints": true
     }
   ]
 }
