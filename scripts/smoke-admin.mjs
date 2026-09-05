@@ -50,8 +50,7 @@ try {
   const dashText = await page.evaluate(() => document.body.innerText);
   check(
     "dashboard shows stats + New project CTA",
-    /total projects/i.test(dashText) && dashText.includes("New project"),
-    "content missing"
+    /total projects/i.test(dashText) && dashText.includes("New project")
   );
 
   // 4. Create a project via the inline form.
