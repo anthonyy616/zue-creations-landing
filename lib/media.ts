@@ -21,6 +21,22 @@ export function parseVariants(raw: string | null): VariantMap | null {
   }
 }
 
+/** All R2 object keys stored for one media item: original + generated variants. */
+export function getMediaObjectKeys(
+  storageKey: string,
+  variants: string | null
+): { Key: string }[] {
+  const objects: { Key: string }[] = [{ Key: storageKey }];
+  const parsed = parseVariants(variants);
+  if (parsed) {
+    for (const entry of Object.values(parsed)) {
+      if (!entry) continue;
+      objects.push({ Key: entry.webpKey }, { Key: entry.jpegKey });
+    }
+  }
+  return objects;
+}
+
 /** How the media list prefers to display an image: md, else sm, else lg, else original. */
 export function pickDisplayVariant(variants: VariantMap | null) {
   if (!variants) return null;

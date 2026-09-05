@@ -2,10 +2,13 @@
 
 import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
+import { DeleteObjectsCommand } from "@aws-sdk/client-s3";
 import { db } from "@/lib/db";
-import { projects } from "@/db/schema";
+import { media, projects } from "@/db/schema";
 import { requireAdminSession } from "@/lib/session";
 import { revalidateProjectPublic } from "@/lib/revalidate";
+import { getMediaObjectKeys } from "@/lib/media";
+import { r2, R2_BUCKET_NAME } from "@/lib/r2";
 import { projectFormSchema } from "./schema";
 
 import type { ProjectFormValues, ActionResult } from "./schema";
@@ -105,8 +108,30 @@ export async function deleteProject(id: string): Promise<ActionResult> {
     return { ok: false, error: "Project not found" };
   }
 
-  // Media rows cascade on delete. R2 object cleanup is handled in the
-  // media pipeline (deleteMedia) before a project with media is removed.
+  // Remove stored R2 objects first so uploads aren't orphaned when the
+  // project (and its cascaded media rows) is deleted.
+  const mediaRows = await db
+    .select({ storageKey: media.storageKey, variants: media.variants })
+    .from(media)
+    .where(eq(media.projectId, id));
+
+  if (mediaRows.length > 0) {
+    const objects = mediaRows.flatMap((row) =>
+      getMediaObjectKeys(row.storageKey, row.variants)
+    );
+    try {
+      await r2.send(
+        new DeleteObjectsCommand({
+          Bucket: R2_BUCKET_NAME,
+          Delete: { Objects: objects },
+        })
+      );
+    } catch (err) {
+      console.error("R2 object deletion failed for project", id, err);
+      return { ok: false, error: "Failed to delete stored files" };
+    }
+  }
+
   await db.delete(projects).where(eq(projects.id, id));
   revalidateProjectPublic(existing.slug, existing.category);
   return { ok: true };

@@ -6,7 +6,7 @@ import { media, projects } from "@/db/schema";
 import { requireAdminSession } from "@/lib/session";
 import { revalidateMediaForProject } from "@/lib/revalidate";
 import { r2, R2_BUCKET_NAME } from "@/lib/r2";
-import { parseVariants } from "@/lib/media";
+import { getMediaObjectKeys } from "@/lib/media";
 
 export async function DELETE(
   _request: Request,
@@ -35,14 +35,7 @@ export async function DELETE(
     return NextResponse.json({ error: "Media not found" }, { status: 404 });
   }
 
-  const objects = [{ Key: row.storageKey }];
-  const variants = parseVariants(row.variants);
-  if (variants) {
-    for (const entry of Object.values(variants)) {
-      if (!entry) continue;
-      objects.push({ Key: entry.webpKey }, { Key: entry.jpegKey });
-    }
-  }
+  const objects = getMediaObjectKeys(row.storageKey, row.variants);
 
   try {
     await r2.send(
