@@ -35,9 +35,36 @@ function TileMedia({
       />
     );
   }
-  // While processing or on failure, show the LQIP placeholder — never the
-  // raw original which can be up to 50 MB.
-  if (slide.status !== "ready" || slide.variantWidths.length === 0) {
+  // While processing and we have an LQIP, show the LQIP placeholder.
+  // While processing with no LQIP, fall back to the original so the frame
+  // is still visible (the original exists in R2 even before variants land).
+  // On failure with no LQIP, show a subtle placeholder.
+  if (slide.status === "processing" && slide.lqipDataUrl) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={slide.lqipDataUrl}
+        alt={slide.alt ?? ""}
+        loading={eager ? "eager" : "lazy"}
+        decoding="async"
+        className="h-full w-full object-cover blur-sm scale-110"
+      />
+    );
+  }
+  if (slide.status === "processing") {
+    // No LQIP yet — show the original so the frame is not blank.
+    return (
+      <Image
+        src={loaderSrc(slide.originalUrl, slide.variantWidths)}
+        alt={slide.alt ?? ""}
+        fill
+        priority={eager}
+        sizes={mode === "rail" ? "(min-width: 1024px) 520px, 82vw" : "100vw"}
+        className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.05]"
+      />
+    );
+  }
+  if (slide.status === "failed") {
     if (slide.lqipDataUrl) {
       return (
         // eslint-disable-next-line @next/next/no-img-element
@@ -392,7 +419,25 @@ export default function MediaScroller({
                         label={slide.alt ?? slide.label ?? "Video"}
                         className="h-full w-full object-contain"
                       />
-                    ) : slide.status !== "ready" || slide.variantWidths.length === 0 ? (
+                    ) : slide.status === "processing" && slide.lqipDataUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={slide.lqipDataUrl}
+                        alt={slide.alt ?? ""}
+                        loading={i === 0 ? "eager" : "lazy"}
+                        decoding="async"
+                        className="max-h-full w-auto max-w-full object-contain blur-sm scale-110 transition-transform duration-700 ease-out group-hover:scale-[1.03]"
+                      />
+                    ) : slide.status === "processing" ? (
+                      <Image
+                        src={loaderSrc(slide.originalUrl, slide.variantWidths)}
+                        alt={slide.alt ?? ""}
+                        fill
+                        priority={i === 0}
+                        sizes="100vw"
+                        className="object-contain transition-transform duration-700 ease-out group-hover:scale-[1.03]"
+                      />
+                    ) : slide.status === "failed" ? (
                       slide.lqipDataUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img

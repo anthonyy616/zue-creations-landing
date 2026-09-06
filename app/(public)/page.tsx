@@ -138,7 +138,7 @@ export default async function HomePage() {
         <FadeUp>
           <header className="pt-20">
             <h2 className="font-display text-3xl font-black uppercase leading-none tracking-tight sm:text-4xl">
-              Browse by<span className="text-accent"> discipline</span>
+              Browse<span className="text-accent"> here</span>
             </h2>
           </header>
         </FadeUp>

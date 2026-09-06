@@ -123,7 +123,7 @@ export async function deleteProject(id: string): Promise<ActionResult> {
       await r2.send(
         new DeleteObjectsCommand({
           Bucket: R2_BUCKET_NAME,
-          Delete: { Objects: objects },
+          Delete: { Objects: objects, Quiet: true },
         })
       );
     } catch (err) {

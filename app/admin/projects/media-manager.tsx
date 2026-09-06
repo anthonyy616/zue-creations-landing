@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useRef, useState, startTransition } from "react";
 import { useRouter } from "next/navigation";
 import { GripVertical, Trash2, UploadCloud, RefreshCw, Loader2 } from "lucide-react";
 import {
@@ -70,8 +70,18 @@ function SortableMediaItem({
       </button>
       <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded bg-zinc-900">
         {item.type === "image" ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={item.url} alt={item.altText ?? ""} className="h-full w-full object-cover" />
+          item.status === "processing" && item.lqipDataUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={item.lqipDataUrl} alt={item.altText ?? ""} className="h-full w-full object-cover blur-sm" />
+          ) : item.status === "processing" ? (
+            // While variants are being generated, show the original so the frame
+            // is not blank. The original is already in R2 (the upload just completed).
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={item.originalUrl} alt={item.altText ?? ""} className="h-full w-full object-cover" />
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={item.url} alt={item.altText ?? ""} className="h-full w-full object-cover" />
+          )
         ) : (
           <video src={item.url} preload="metadata" muted playsInline className="h-full w-full object-cover" />
         )}
@@ -306,7 +316,9 @@ export default function MediaManager({
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error ?? "Delete failed");
       }
-      setItems((prev) => prev.filter((m) => m.id !== id));
+      startTransition(() => {
+        setItems((prev) => prev.filter((m) => m.id !== id));
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Delete failed");
     } finally {

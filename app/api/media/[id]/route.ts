@@ -41,7 +41,7 @@ export async function DELETE(
     await r2.send(
       new DeleteObjectsCommand({
         Bucket: R2_BUCKET_NAME,
-        Delete: { Objects: objects.map((o) => ({ Key: o.Key })), Quiet: false },
+        Delete: { Objects: objects.map((o) => ({ Key: o.Key })), Quiet: true },
       })
     );
   } catch (err) {
