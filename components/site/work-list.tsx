@@ -6,6 +6,7 @@ import type { ProjectCard } from "@/lib/public";
 import type { MediaView } from "@/lib/media";
 import { loaderSrc } from "@/lib/image-loader";
 import AutoplayVideo from "./autoplay-video";
+import SafeText from "./safe-text";
 
 export const CATEGORY_LABELS: Record<string, string> = {
   photography: "Photography",
@@ -105,11 +106,11 @@ export function ProjectRow({
         {CATEGORY_LABELS[project.category]} · {year}
       </span>
       <h3 className="font-display mt-3 text-2xl font-bold uppercase leading-[0.95] tracking-tight text-fg sm:text-3xl">
-        {project.title}
+        <SafeText>{project.title}</SafeText>
       </h3>
       {project.description ? (
         <p className="mt-4 line-clamp-3 max-w-md text-sm leading-relaxed text-muted">
-          {project.description}
+          <SafeText>{project.description}</SafeText>
         </p>
       ) : null}
       <span className="mt-5 inline-flex items-center gap-1 text-[11px] font-medium uppercase tracking-[0.18em] text-accent">

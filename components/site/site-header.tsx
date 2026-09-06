@@ -3,6 +3,7 @@ import { SITE_NAME, INSTAGRAM_URL, INSTAGRAM_HANDLE } from "@/lib/site";
 import NavLinks from "./nav";
 import ThemeToggle from "./theme-toggle";
 import InstagramIcon from "./instagram-icon";
+import { safeInstagramUrl } from "@/lib/sanitize";
 
 export default function SiteHeader() {
   return (
@@ -22,7 +23,7 @@ export default function SiteHeader() {
         <div className="flex items-center gap-2">
           {INSTAGRAM_URL ? (
             <a
-              href={INSTAGRAM_URL}
+              href={safeInstagramUrl(INSTAGRAM_URL) ?? "#"}
               target="_blank"
               rel="noreferrer"
               aria-label={

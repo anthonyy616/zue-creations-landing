@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { sanitizeText } from "@/lib/sanitize";
 
 export default function AutoplayVideo({
   src,
@@ -75,7 +76,7 @@ export default function AutoplayVideo({
       preload="metadata"
       controls={showControls}
       onClick={handleClick}
-      aria-label={label}
+      aria-label={label != null ? sanitizeText(label) : undefined}
       className={className}
     />
   );

@@ -11,8 +11,10 @@ import {
 } from "@/lib/public";
 import MediaScroller from "@/components/site/media-scroller";
 import { mediaToSlide } from "@/lib/media-slides";
-import { FadeUp, StaggerItem, StaggerList } from "@/components/site/motion";
+import { FadeUp } from "@/components/site/motion";
 import { CATEGORY_LABELS } from "@/components/site/work-list";
+import SafeText from "@/components/site/safe-text";
+import { safeInstagramUrl, sanitizeText } from "@/lib/sanitize";
 
 export const revalidate = 60;
 
@@ -88,17 +90,17 @@ export default async function WorkPage({ params }: { params: Promise<Params> }) 
           <FadeUp>
             <p className="mono-meta text-[11px] uppercase tracking-[0.24em] text-accent">
               {CATEGORY_LABELS[project.category]} · {year}
-              {project.location ? ` · ${project.location}` : ""}
+              {project.location ? ` · ${sanitizeText(project.location)}` : ""}
             </p>
             <h1 className="font-display mt-6 max-w-5xl text-5xl font-black uppercase leading-[0.88] tracking-tight text-fg sm:text-7xl">
-              {project.title}
+              <SafeText>{project.title}</SafeText>
             </h1>
           </FadeUp>
           <div className="mt-8 flex flex-col gap-8 sm:flex-row sm:items-end sm:justify-between">
             {project.description ? (
               <FadeUp delay={0.12} className="max-w-xl">
                 <p className="text-base leading-relaxed text-muted sm:text-lg">
-                  {project.description}
+                  <SafeText>{project.description}</SafeText>
                 </p>
               </FadeUp>
             ) : (
@@ -107,10 +109,11 @@ export default async function WorkPage({ params }: { params: Promise<Params> }) 
             {project.instagramUrl ? (
               <FadeUp delay={0.2}>
                 <a
-                  href={project.instagramUrl}
+                  href={safeInstagramUrl(project.instagramUrl) ?? "#"}
                   target="_blank"
                   rel="noreferrer"
                   className="group/ig inline-flex w-fit items-center gap-2 border border-line px-4 py-2 text-[11px] uppercase tracking-[0.18em] text-fg transition-all duration-300 hover:border-accent hover:text-accent hover:translate-x-1"
+                  aria-invalid={project.instagramUrl && !safeInstagramUrl(project.instagramUrl) ? true : undefined}
                 >
                   <InstagramIcon size={14} strokeWidth={1.5} />
                   View on Instagram <ArrowUpRight size={13} strokeWidth={1.5} className="transition-transform duration-300 group-hover/ig:translate-x-0.5 group-hover/ig:-translate-y-0.5" />

@@ -23,6 +23,7 @@ import ProjectForm from "./project-form";
 import SortableProjectItem from "./sortable-project-item";
 import { deleteProject } from "./actions";
 import { updateProjectSortOrder } from "./projects-actions";
+import { sanitizeText } from "@/lib/sanitize";
 
 const CATEGORY_LABELS: Record<string, string> = {
   photography: "Photography",
@@ -39,7 +40,9 @@ export default function ProjectsManager({
   const [creating, setCreating] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [listError, setListError] = useState<string | null>(null);
-  const [reorderingId, setReorderingId] = useState<string | null>(null);
+// reorderingId is set during drag operations but not used elsewhere —
+  // kept for potential future use (e.g. visual drag feedback).
+  const [_reorderingId, setReorderingId] = useState<string | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -47,7 +50,7 @@ export default function ProjectsManager({
   );
 
   async function handleDelete(id: string, title: string) {
-    if (!window.confirm(`Delete “${title}”? This cannot be undone.`)) return;
+    if (!window.confirm(`Delete “${sanitizeText(title)}”? This cannot be undone.`)) return;
     setBusyId(id);
     setListError(null);
     const result = await deleteProject(id);
@@ -75,7 +78,7 @@ export default function ProjectsManager({
     }
 
     const reordered = arrayMove(projects, oldIndex, newIndex);
-    setReorderingId(active.id as string);
+    setReorderingId(active.id as string); // ok
 
     const result = await updateProjectSortOrder(reordered.map((p) => p.id));
     if (result.ok) {

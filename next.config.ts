@@ -20,6 +20,17 @@ const nextConfig: NextConfig = {
   images: {
     loader: "custom",
     loaderFile: "./lib/image-loader.ts",
+    // Allow images from our R2 custom domain.
+    remotePatterns: process.env.R2_PUBLIC_MEDIA_URL
+      ? [
+          {
+            protocol: "https",
+            hostname: process.env.R2_PUBLIC_MEDIA_URL
+              .replace(/^https?:\/\//, "")
+              .replace(/\/.*$/, ""),
+          },
+        ]
+      : [],
   },
 };
 

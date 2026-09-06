@@ -7,14 +7,16 @@ const archivo = Archivo({
   variable: "--font-archivo",
   subsets: ["latin"],
   display: "swap",
+  preload: true,
 });
 
 const instrumentSerif = Instrument_Serif({
   variable: "--font-serif",
   subsets: ["latin"],
-  weight: "400",
+  weight: ["400"],
   style: ["normal", "italic"],
   display: "swap",
+  preload: false,
 });
 
 export const metadata: Metadata = {

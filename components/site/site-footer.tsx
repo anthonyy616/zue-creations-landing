@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 import { SITE_NAME, INSTAGRAM_URL, INSTAGRAM_HANDLE } from "@/lib/site";
 import InstagramIcon from "./instagram-icon";
+import { safeInstagramUrl } from "@/lib/sanitize";
 
 export default function SiteFooter() {
   const year = new Date().getFullYear();
@@ -47,7 +48,7 @@ export default function SiteFooter() {
                 {INSTAGRAM_URL ? (
                   <li>
                     <a
-                      href={INSTAGRAM_URL}
+                      href={safeInstagramUrl(INSTAGRAM_URL) ?? "#"}
                       target="_blank"
                       rel="noreferrer"
                       className="text-muted transition-colors hover:text-accent"
