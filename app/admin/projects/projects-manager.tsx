@@ -1,11 +1,33 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import Link from "next/link";
 import { format } from "date-fns";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import {
+  SortableContext,
+  useSortable,
+  type SortableContextProps,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import type { Project } from "@/db/schema";
 import ProjectForm from "./project-form";
+import SortableProjectItem from "./sortable-project-item";
 import { deleteProject } from "./actions";
+import { updateProjectSortOrder } from "./projects-actions";
 
 const CATEGORY_LABELS: Record<string, string> = {
   photography: "Photography",
@@ -22,6 +44,12 @@ export default function ProjectsManager({
   const [creating, setCreating] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [listError, setListError] = useState<string | null>(null);
+  const [reorderingId, setReorderingId] = useState<string | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
 
   async function handleDelete(id: string, title: string) {
     if (!window.confirm(`Delete “${title}”? This cannot be undone.`)) return;
@@ -35,6 +63,33 @@ export default function ProjectsManager({
     }
     setProjects((prev) => prev.filter((p) => p.id !== id));
     setBusyId(null);
+  }
+
+  async function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) {
+      setReorderingId(null);
+      return;
+    }
+
+    const oldIndex = projects.findIndex((p) => p.id === active.id);
+    const newIndex = projects.findIndex((p) => p.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) {
+      setReorderingId(null);
+      return;
+    }
+
+    const reordered = arrayMove(projects, oldIndex, newIndex);
+    setReorderingId(active.id as string);
+
+    const result = await updateProjectSortOrder(reordered.map((p) => p.id));
+    if (result.ok) {
+      setProjects(reordered);
+    } else {
+      setListError(result.error ?? "Could not save the new order");
+      setProjects(projects);
+    }
+    setReorderingId(null);
   }
 
   return (
@@ -69,46 +124,29 @@ export default function ProjectsManager({
           No projects yet. Create your first one to get started.
         </p>
       ) : (
-        <ul className="overflow-hidden rounded-lg border border-zinc-800">
-          {projects.map((project) => (
-            <li
-              key={project.id}
-              className="flex items-center gap-4 border-b border-zinc-800 bg-zinc-900 px-4 py-3 last:border-b-0"
-            >
-              <Link
-                href={`/admin/projects/${project.id}`}
-                className="min-w-0 flex-1"
-              >
-                <span className="block truncate text-sm font-medium text-white">
-                  {project.title}
-                </span>
-                <span className="block text-xs uppercase tracking-wide text-zinc-500">
-                  {CATEGORY_LABELS[project.category]} ·{" "}
-                  {format(project.date, "yyyy")}
-                  {project.featured ? " · Featured" : ""}
-                </span>
-              </Link>
-              <span className="hidden text-xs text-zinc-600 sm:block">
-                /work/{project.slug}
-              </span>
-              <div className="flex shrink-0 gap-2">
-                <Link
-                  href={`/admin/projects/${project.id}`}
-                  className="rounded border border-zinc-700 px-3 py-1 text-xs text-zinc-300 hover:border-zinc-500"
-                >
-                  Edit
-                </Link>
-                <button
-                  onClick={() => handleDelete(project.id, project.title)}
-                  disabled={busyId === project.id}
-                  className="rounded border border-red-500/40 px-3 py-1 text-xs text-red-400 hover:bg-red-500/10 disabled:opacity-50"
-                >
-                  {busyId === project.id ? "Deleting…" : "Delete"}
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext
+            items={projects.map((p) => p.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            <ul className="overflow-hidden rounded-lg border border-zinc-800">
+              {projects.map((project) => (
+                <SortableProjectItem
+                  key={project.id}
+                  project={project}
+                  categoryLabels={CATEGORY_LABELS}
+                  busyId={busyId}
+                  reorderingId={reorderingId}
+                  onDelete={handleDelete}
+                />
+              ))}
+            </ul>
+          </SortableContext>
+        </DndContext>
       )}
     </div>
   );
