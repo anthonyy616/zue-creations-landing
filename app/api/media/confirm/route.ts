@@ -8,6 +8,7 @@ import { requireAdminSession } from "@/lib/session";
 import { revalidateMediaForProject } from "@/lib/revalidate";
 import { generateImageVariants, generateLQIP } from "@/lib/image";
 import { buildMediaView } from "@/lib/media";
+import { info, warn, error } from "@/lib/log";
 
 const confirmSchema = z.object({
   projectId: z.string().uuid(),
@@ -18,18 +19,31 @@ const confirmSchema = z.object({
 
 export async function POST(request: Request) {
   if (!(await requireAdminSession())) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    warn("Media confirm: unauthorized request", undefined, {
+      operation: "media.confirm",
+      status: 401,
+    });
+    return NextResponse.json({ error: "Please log in to continue." }, { status: 401 });
   }
 
   let body: unknown;
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    error("Media confirm: failed to parse request body", undefined, {
+      operation: "media.confirm",
+      status: 400,
+    });
+    return NextResponse.json({ error: "Invalid request. Please try again." }, { status: 400 });
   }
 
   const parsed = confirmSchema.safeParse(body);
   if (!parsed.success) {
+    warn("Media confirm: validation failed", undefined, {
+      operation: "media.confirm",
+      context: { issues: parsed.error.issues },
+      status: 400,
+    });
     return NextResponse.json(
       { error: parsed.error.issues[0]?.message ?? "Invalid input" },
       { status: 400 }
@@ -44,7 +58,12 @@ export async function POST(request: Request) {
     .where(eq(projects.id, projectId))
     .limit(1);
   if (!project[0]) {
-    return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    error("Media confirm: project not found", undefined, {
+      operation: "media.confirm",
+      context: { projectId },
+      status: 404,
+    });
+    return NextResponse.json({ error: "Project not found." }, { status: 404 });
   }
 
   const [nextOrder] = await db
@@ -59,7 +78,10 @@ export async function POST(request: Request) {
     try {
       lqipDataUrl = await generateLQIP(key);
     } catch (err) {
-      console.error("LQIP generation failed (non-fatal)", err);
+      warn("Media confirm: LQIP generation failed (non-fatal)", err, {
+        operation: "media.confirm",
+        context: { projectId, key },
+      });
       // LQIP failure is non-fatal — we still insert the row.
     }
   }
@@ -98,9 +120,16 @@ export async function POST(request: Request) {
           })
           .where(eq(media.id, row.id));
 
+        info("Media confirm: variant generation completed", {
+          operation: "media.confirm",
+          context: { mediaId: row.id, key },
+        });
         revalidateMediaForProject(project[0].slug, project[0].category);
       } catch (err) {
-        console.error("Variant generation failed", err);
+        error("Media confirm: variant generation failed", err, {
+          operation: "media.confirm",
+          context: { mediaId: row.id, key, projectId },
+        });
         // Mark as failed so the admin can retry — never silently serve the
         // original as a permanent fallback.
         await db

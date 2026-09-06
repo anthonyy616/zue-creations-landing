@@ -86,7 +86,14 @@ export default function ProjectsManager({
     if (result.ok) {
       setProjects(reordered);
     } else {
-      setListError(result.error ?? "Could not save the new order");
+      // Map known error types to user-friendly messages.
+      const msg = result.error ?? "Could not save the new order";
+      if (msg.includes("session expired") || msg.includes("log in")) {
+        // Let the middleware handle the redirect; just show a brief message.
+        setListError("Your session expired. Please log in again.");
+      } else {
+        setListError(msg);
+      }
       setProjects(projects);
     }
     setReorderingId(null);

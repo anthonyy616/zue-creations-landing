@@ -7,13 +7,18 @@ import { requireAdminSession } from "@/lib/session";
 import { revalidateMediaForProject } from "@/lib/revalidate";
 import { r2, R2_BUCKET_NAME } from "@/lib/r2";
 import { getMediaObjectKeys } from "@/lib/media";
+import { info, warn, error } from "@/lib/log";
 
 export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   if (!(await requireAdminSession())) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    warn("Media delete: unauthorized request", undefined, {
+      operation: "media.delete",
+      status: 401,
+    });
+    return NextResponse.json({ error: "Please log in to continue." }, { status: 401 });
   }
 
   const { id } = await params;
@@ -32,7 +37,12 @@ export async function DELETE(
     .limit(1);
 
   if (!row) {
-    return NextResponse.json({ error: "Media not found" }, { status: 404 });
+    error("Media delete: media not found", undefined, {
+      operation: "media.delete",
+      context: { mediaId: id },
+      status: 404,
+    });
+    return NextResponse.json({ error: "Media not found." }, { status: 404 });
   }
 
   const objects = getMediaObjectKeys(row.storageKey, row.variants);
@@ -50,11 +60,17 @@ export async function DELETE(
     // objects were actually deleted. Treat MalformedXML as a non-fatal
     // warning — the media row is still removed from the DB below.
     if (errObj.Code === "MalformedXML") {
-      console.warn("R2 DeleteObjects returned MalformedXML (objects likely deleted)", err);
+      warn("Media delete: R2 DeleteObjects returned MalformedXML (objects likely deleted)", err, {
+        operation: "media.delete",
+        context: { mediaId: id, storageKey: row.storageKey },
+      });
     } else {
-      console.error("R2 object deletion failed", err);
+      error("Media delete: R2 object deletion failed", err, {
+        operation: "media.delete",
+        context: { mediaId: id, storageKey: row.storageKey },
+      });
       return NextResponse.json(
-        { error: "Failed to delete stored files" },
+        { error: "Couldn't delete the file from storage. Please try again." },
         { status: 500 }
       );
     }

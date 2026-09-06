@@ -8,6 +8,7 @@ import { requireAdminSession } from "@/lib/session";
 import { revalidateMediaForProject } from "@/lib/revalidate";
 import { generateImageVariants } from "@/lib/image";
 import { buildMediaView } from "@/lib/media";
+import { info, warn, error } from "@/lib/log";
 
 const retrySchema = z.object({
   mediaId: z.string().uuid(),
@@ -15,18 +16,31 @@ const retrySchema = z.object({
 
 export async function POST(request: Request) {
   if (!(await requireAdminSession())) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    warn("Media retry: unauthorized request", undefined, {
+      operation: "media.retry",
+      status: 401,
+    });
+    return NextResponse.json({ error: "Please log in to continue." }, { status: 401 });
   }
 
   let body: unknown;
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    error("Media retry: failed to parse request body", undefined, {
+      operation: "media.retry",
+      status: 400,
+    });
+    return NextResponse.json({ error: "Invalid request. Please try again." }, { status: 400 });
   }
 
   const parsed = retrySchema.safeParse(body);
   if (!parsed.success) {
+    warn("Media retry: validation failed", undefined, {
+      operation: "media.retry",
+      context: { issues: parsed.error.issues },
+      status: 400,
+    });
     return NextResponse.json(
       { error: parsed.error.issues[0]?.message ?? "Invalid input" },
       { status: 400 }
@@ -40,11 +54,21 @@ export async function POST(request: Request) {
     .limit(1);
 
   if (!row) {
-    return NextResponse.json({ error: "Media not found" }, { status: 404 });
+    error("Media retry: media not found", undefined, {
+      operation: "media.retry",
+      context: { mediaId: parsed.data.mediaId },
+      status: 404,
+    });
+    return NextResponse.json({ error: "Media not found." }, { status: 404 });
   }
 
   if (row.type !== "image") {
-    return NextResponse.json({ error: "Only images can be retried" }, { status: 400 });
+    warn("Media retry: attempted on non-image media", undefined, {
+      operation: "media.retry",
+      context: { mediaId: parsed.data.mediaId, mediaType: row.type },
+      status: 400,
+    });
+    return NextResponse.json({ error: "Only images can be retried." }, { status: 400 });
   }
 
   // Mark as processing immediately so the UI reflects the state.
@@ -73,8 +97,16 @@ export async function POST(request: Request) {
           status: "ready",
         })
         .where(eq(media.id, row.id));
+
+      info("Media retry: variant generation completed", {
+        operation: "media.retry",
+        context: { mediaId: row.id, key: row.storageKey },
+      });
     } catch (err) {
-      console.error("Retry variant generation failed", err);
+      error("Media retry: variant generation failed", err, {
+        operation: "media.retry",
+        context: { mediaId: row.id, key: row.storageKey },
+      });
       await db.update(media).set({ status: "failed" }).where(eq(media.id, row.id));
     }
 

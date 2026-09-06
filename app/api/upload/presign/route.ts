@@ -5,17 +5,26 @@ import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { r2, R2_BUCKET_NAME, isR2Configured } from "@/lib/r2";
 import { requireAdminSession } from "@/lib/session";
+import { info, warn, error } from "@/lib/log";
 
 const ALLOWED_CONTENT_TYPES =
   /^(image\/(jpeg|png|webp|gif|avif)|video\/(mp4|webm|quicktime))$/;
 
 export async function POST(request: Request) {
   if (!(await requireAdminSession())) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    warn("Upload presign: unauthorized request", undefined, {
+      operation: "upload.presign",
+      status: 401,
+    });
+    return NextResponse.json({ error: "Please log in to continue." }, { status: 401 });
   }
   if (!isR2Configured()) {
+    error("Upload presign: R2 not configured", undefined, {
+      operation: "upload.presign",
+      status: 503,
+    });
     return NextResponse.json(
-      { error: "R2 storage is not configured" },
+      { error: "Uploads aren't available right now. Please try again later." },
       { status: 503 }
     );
   }
@@ -24,7 +33,11 @@ export async function POST(request: Request) {
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    error("Upload presign: failed to parse request body", undefined, {
+      operation: "upload.presign",
+      status: 400,
+    });
+    return NextResponse.json({ error: "Invalid request. Please try again." }, { status: 400 });
   }
 
   const filename = body.filename?.trim();
@@ -36,8 +49,13 @@ export async function POST(request: Request) {
     );
   }
   if (!ALLOWED_CONTENT_TYPES.test(contentType)) {
+    warn("Upload presign: disallowed content type", undefined, {
+      operation: "upload.presign",
+      context: { contentType },
+      status: 415,
+    });
     return NextResponse.json(
-      { error: "File type not allowed. Use images (JPEG/PNG/WebP/GIF/AVIF) or video (MP4/WebM/MOV)." },
+      { error: "That file type isn't allowed. Please upload an image (JPEG, PNG, WebP, GIF, AVIF) or video (MP4, WebM, MOV)." },
       { status: 415 }
     );
   }

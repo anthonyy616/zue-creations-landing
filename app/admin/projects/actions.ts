@@ -10,6 +10,7 @@ import { revalidateProjectPublic } from "@/lib/revalidate";
 import { getMediaObjectKeys } from "@/lib/media";
 import { r2, R2_BUCKET_NAME } from "@/lib/r2";
 import { projectFormSchema } from "./schema";
+import { info, warn, error, logAndReturnError } from "@/lib/log";
 
 import type { ProjectFormValues, ActionResult } from "./schema";
 /** Converts a YYYY-MM-DD form value into a local-midnight Date (avoids timezone drift). */
@@ -36,12 +37,18 @@ export async function createProject(
   rawValues: ProjectFormValues
 ): Promise<ActionResult> {
   if (!(await requireAdminSession())) {
-    return { ok: false, error: "Not authenticated" };
+    warn("createProject: unauthorized", undefined, { operation: "project.create", status: 401 });
+    return { ok: false, error: "Please log in to continue." };
   }
 
   const parsed = projectFormSchema.safeParse(rawValues);
   if (!parsed.success) {
-    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
+    warn("createProject: validation failed", undefined, {
+      operation: "project.create",
+      context: { issues: parsed.error.issues },
+      status: 400,
+    });
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Please fix the form errors." };
   }
 
   const data = normalizeValues(parsed.data);
@@ -52,12 +59,26 @@ export async function createProject(
     .where(eq(projects.slug, data.slug))
     .limit(1);
   if (existing[0]) {
-    return { ok: false, error: "A project with this slug already exists" };
+    warn("createProject: duplicate slug", undefined, {
+      operation: "project.create",
+      context: { slug: data.slug },
+      status: 400,
+    });
+    return { ok: false, error: "A project with this web address already exists. Try a different one." };
   }
 
-  const [created] = await db.insert(projects).values(data).returning();
-  revalidateProjectPublic(created.slug, created.category);
-  redirect(`/admin/projects/${created.id}`);
+  try {
+    const [created] = await db.insert(projects).values(data).returning();
+    info("createProject: project created", { operation: "project.create", context: { projectId: created.id, slug: created.slug } });
+    revalidateProjectPublic(created.slug, created.category);
+    redirect(`/admin/projects/${created.id}`);
+  } catch (err) {
+    error("createProject: database insert failed", err, {
+      operation: "project.create",
+      context: { slug: data.slug, title: data.title },
+    });
+    return { ok: false, error: "Couldn't create the project. Please try again." };
+  }
 }
 
 export async function updateProject(
@@ -65,12 +86,18 @@ export async function updateProject(
   rawValues: ProjectFormValues
 ): Promise<ActionResult> {
   if (!(await requireAdminSession())) {
-    return { ok: false, error: "Not authenticated" };
+    warn("updateProject: unauthorized", undefined, { operation: "project.update", context: { projectId: id }, status: 401 });
+    return { ok: false, error: "Please log in to continue." };
   }
 
   const parsed = projectFormSchema.safeParse(rawValues);
   if (!parsed.success) {
-    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
+    warn("updateProject: validation failed", undefined, {
+      operation: "project.update",
+      context: { projectId: id, issues: parsed.error.issues },
+      status: 400,
+    });
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Please fix the form errors." };
   }
 
   const data = normalizeValues(parsed.data);
@@ -81,31 +108,56 @@ export async function updateProject(
     .where(eq(projects.slug, data.slug))
     .limit(1);
   if (duplicate[0] && duplicate[0].id !== id) {
-    return { ok: false, error: "A project with this slug already exists" };
+    warn("updateProject: duplicate slug", undefined, {
+      operation: "project.update",
+      context: { projectId: id, slug: data.slug },
+      status: 400,
+    });
+    return { ok: false, error: "Another project already uses this web address. Try a different one." };
   }
 
-  const [updated] = await db
-    .update(projects)
-    .set({ ...data, updatedAt: new Date() })
-    .where(eq(projects.id, id))
-    .returning();
+  try {
+    const [updated] = await db
+      .update(projects)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(projects.id, id))
+      .returning();
 
-  if (!updated) {
-    return { ok: false, error: "Project not found" };
+    if (!updated) {
+      error("updateProject: project not found", undefined, {
+        operation: "project.update",
+        context: { projectId: id },
+        status: 404,
+      });
+      return { ok: false, error: "Project not found." };
+    }
+
+    info("updateProject: project updated", { operation: "project.update", context: { projectId: id, slug: updated.slug } });
+    revalidateProjectPublic(updated.slug, updated.category);
+    return { ok: true };
+  } catch (err) {
+    error("updateProject: database update failed", err, {
+      operation: "project.update",
+      context: { projectId: id },
+    });
+    return { ok: false, error: "Couldn't save the changes. Please try again." };
   }
-
-  revalidateProjectPublic(updated.slug, updated.category);
-  return { ok: true };
 }
 
 export async function deleteProject(id: string): Promise<ActionResult> {
   if (!(await requireAdminSession())) {
-    return { ok: false, error: "Not authenticated" };
+    warn("deleteProject: unauthorized", undefined, { operation: "project.delete", status: 401 });
+    return { ok: false, error: "Please log in to continue." };
   }
 
   const existing = await getProjectByIdForAction(id);
   if (!existing) {
-    return { ok: false, error: "Project not found" };
+    error("deleteProject: project not found", undefined, {
+      operation: "project.delete",
+      context: { projectId: id },
+      status: 404,
+    });
+    return { ok: false, error: "Project not found." };
   }
 
   // Remove stored R2 objects first so uploads aren't orphaned when the
@@ -129,17 +181,32 @@ export async function deleteProject(id: string): Promise<ActionResult> {
     } catch (err: unknown) {
       const errObj = err as Record<string, unknown>;
       if (errObj.Code === "MalformedXML") {
-        console.warn("R2 DeleteObjects returned MalformedXML (objects likely deleted)", err);
+        warn("deleteProject: R2 DeleteObjects returned MalformedXML (objects likely deleted)", err, {
+          operation: "project.delete",
+          context: { projectId: id, mediaCount: mediaRows.length },
+        });
       } else {
-        console.error("R2 object deletion failed for project", id, err);
-        return { ok: false, error: "Failed to delete stored files" };
+        error("deleteProject: R2 object deletion failed", err, {
+          operation: "project.delete",
+          context: { projectId: id, mediaCount: mediaRows.length },
+        });
+        return { ok: false, error: "Couldn't delete the files from storage. Please try again." };
       }
     }
   }
 
-  await db.delete(projects).where(eq(projects.id, id));
-  revalidateProjectPublic(existing.slug, existing.category);
-  return { ok: true };
+  try {
+    await db.delete(projects).where(eq(projects.id, id));
+    info("deleteProject: project deleted", { operation: "project.delete", context: { projectId: id, slug: existing.slug } });
+    revalidateProjectPublic(existing.slug, existing.category);
+    return { ok: true };
+  } catch (err) {
+    error("deleteProject: database delete failed", err, {
+      operation: "project.delete",
+      context: { projectId: id, slug: existing.slug },
+    });
+    return { ok: false, error: "Couldn't delete the project. Please try again." };
+  }
 }
 
 async function getProjectByIdForAction(id: string) {

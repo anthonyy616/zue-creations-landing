@@ -166,7 +166,15 @@ export default function MediaManager({
           router.push("/admin/login");
           throw new Error("Session expired — please log in again");
         }
-        throw new Error(data.error ?? `Presign failed (${res.status})`);
+        const backendError = data.error ?? `Presign failed (${res.status})`;
+      // Map known backend errors to user-friendly messages.
+      if (res.status === 401) {
+        throw new Error("Your session expired. Please log in again.");
+      }
+      if (res.status === 503) {
+        throw new Error("Uploads aren't available right now. Please try again later.");
+      }
+      throw new Error(backendError);
       }
       return res.json() as Promise<{ uploadUrl: string; key: string }>;
     },
@@ -190,7 +198,14 @@ export default function MediaManager({
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error ?? "Failed to record upload");
+        const backendError = data.error ?? "Failed to record upload";
+        if (res.status === 401) {
+          throw new Error("Your session expired. Please log in again.");
+        }
+        if (res.status === 404) {
+          throw new Error("Project not found. Please refresh the page.");
+        }
+        throw new Error(backendError);
       }
       const data = (await res.json()) as { media: MediaView };
       return data.media;
@@ -291,7 +306,17 @@ export default function MediaManager({
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error ?? "Retry failed");
+        const backendError = data.error ?? "Retry failed";
+        if (res.status === 401) {
+          throw new Error("Your session expired. Please log in again.");
+        }
+        if (res.status === 404) {
+          throw new Error("This file was already removed. Please refresh the page.");
+        }
+        if (res.status === 400) {
+          throw new Error("This isn't an image, or something changed. Please refresh and try again.");
+        }
+        throw new Error(backendError);
       }
       const data = (await res.json()) as { media: MediaView };
       setItems((prev) => prev.map((m) => (m.id === id ? data.media : m)));
@@ -314,7 +339,14 @@ export default function MediaManager({
       const res = await fetch(`/api/media/${id}`, { method: "DELETE" });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error ?? "Delete failed");
+        const backendError = data.error ?? "Delete failed";
+        if (res.status === 401) {
+          throw new Error("Your session expired. Please log in again.");
+        }
+        if (res.status === 404) {
+          throw new Error("This file was already removed. Please refresh the page.");
+        }
+        throw new Error(backendError);
       }
       startTransition(() => {
         setItems((prev) => prev.filter((m) => m.id !== id));
