@@ -15,6 +15,13 @@
       "when": 1788640000000,
       "tag": "0001_add_media_status_lqip",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1788729251030,
+      "tag": "0002_gigantic_wither",
+      "breakpoints": true
     }
   ]
 }

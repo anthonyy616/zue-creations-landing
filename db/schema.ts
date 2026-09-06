@@ -59,6 +59,7 @@ export const media = pgTable(
     height: integer("height"),
     status: mediaStatusEnum("status").default("processing").notNull(),
     lqipDataUrl: text("lqip_data_url"),
+    posterKey: varchar("poster_key", { length: 500 }),
     createdAt: timestamp("created_at").defaultNow(),
   },
   (table) => [index("media_project_id_idx").on(table.projectId)]

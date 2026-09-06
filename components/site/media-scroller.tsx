@@ -27,9 +27,11 @@ function TileMedia({
   eager: boolean;
 }) {
   if (slide.kind === "video") {
+    // Use the poster URL if available — it's the guaranteed visual fallback
     return (
       <AutoplayVideo
         src={slide.src}
+        poster={slide.poster ?? undefined}
         label={slide.alt ?? slide.label ?? "Video"}
         className="h-full w-full object-cover"
       />

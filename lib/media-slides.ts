@@ -23,6 +23,8 @@ export type MediaSlide = {
   status: "processing" | "ready" | "failed";
   /** Inline base64 data URL for a tiny blurred placeholder. */
   lqipDataUrl: string | null;
+  /** Poster URL for videos (the guaranteed visual fallback). */
+  poster: string | null;
 };
 
 /** Builds a serializable slide from a MediaView, optionally tagged with its project. */
@@ -41,5 +43,6 @@ export function mediaToSlide(
     href: meta?.href,
     status: media.status,
     lqipDataUrl: media.lqipDataUrl,
+    poster: media.posterUrl,
   };
 }

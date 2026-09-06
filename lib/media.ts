@@ -61,6 +61,8 @@ export type MediaView = {
   status: "processing" | "ready" | "failed";
   /** Inline base64 data URL for a tiny blurred placeholder. */
   lqipDataUrl: string | null;
+  /** Public URL of the generated poster frame (videos only; null if not generated). */
+  posterUrl: string | null;
 };
 
 /** Builds a client-friendly view with an absolute display URL resolved from stored keys. */
@@ -69,6 +71,7 @@ export function buildMediaView(row: Media): MediaView {
   const status = (row.status as MediaView["status"]) ?? "ready";
 
   if (row.type === "video") {
+    const posterUrl = row.posterKey ? publicMediaUrl(row.posterKey) : null;
     const view: MediaView = {
       id: row.id,
       type: "video",
@@ -82,6 +85,7 @@ export function buildMediaView(row: Media): MediaView {
       sortOrder: row.sortOrder ?? 0,
       status,
       lqipDataUrl: row.lqipDataUrl ?? null,
+      posterUrl,
     };
     return view;
   }
@@ -108,6 +112,7 @@ export function buildMediaView(row: Media): MediaView {
     sortOrder: row.sortOrder ?? 0,
     status,
     lqipDataUrl: row.lqipDataUrl ?? null,
+    posterUrl: null,
   };
   return view;
 }

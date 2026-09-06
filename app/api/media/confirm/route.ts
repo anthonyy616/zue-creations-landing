@@ -7,6 +7,7 @@ import { media, projects, mediaTypeEnum } from "@/db/schema";
 import { requireAdminSession } from "@/lib/session";
 import { revalidateMediaForProject } from "@/lib/revalidate";
 import { generateImageVariants, generateLQIP } from "@/lib/image";
+import { generateVideoPoster } from "@/lib/video-poster";
 import { buildMediaView } from "@/lib/media";
 import { info, warn, error } from "@/lib/log";
 
@@ -86,7 +87,8 @@ export async function POST(request: Request) {
     }
   }
 
-  // --- Insert the row immediately with status: "processing" ---
+  // --- Insert the row immediately with status: "processing" (images) or "ready" (videos) ---
+  // Videos start as "ready" since no processing is needed; posters are generated async.
   const [row] = await db
     .insert(media)
     .values({
@@ -100,12 +102,13 @@ export async function POST(request: Request) {
       height: null,
       status: type === "image" ? "processing" : "ready",
       lqipDataUrl,
+      posterKey: null,
     })
     .returning();
 
   revalidateMediaForProject(project[0].slug, project[0].category);
 
-  // --- Kick off variant generation AFTER the response is sent ---
+  // --- Kick off processing AFTER the response is sent ---
   if (type === "image") {
     after(async () => {
       try {
@@ -138,6 +141,37 @@ export async function POST(request: Request) {
           .where(eq(media.id, row.id));
 
         revalidateMediaForProject(project[0].slug, project[0].category);
+      }
+    });
+  } else if (type === "video") {
+    // Generate poster for videos after the response is sent
+    after(async () => {
+      try {
+        const generatedKey = await generateVideoPoster(key);
+        if (generatedKey) {
+          await db
+            .update(media)
+            .set({ posterKey: generatedKey })
+            .where(eq(media.id, row.id));
+
+          info("Media confirm: video poster generated", {
+            operation: "media.confirm",
+            context: { mediaId: row.id, key, posterKey: generatedKey },
+          });
+          revalidateMediaForProject(project[0].slug, project[0].category);
+        } else {
+          warn("Media confirm: video poster generation returned null", undefined, {
+            operation: "media.confirm",
+            context: { mediaId: row.id, key },
+          });
+        }
+      } catch (err) {
+        error("Media confirm: video poster generation failed", err, {
+          operation: "media.confirm",
+          context: { mediaId: row.id, key, projectId },
+        });
+        // Poster generation failure is non-fatal — video is still usable,
+        // just without a dedicated poster. The frontend will use fallback.
       }
     });
   }

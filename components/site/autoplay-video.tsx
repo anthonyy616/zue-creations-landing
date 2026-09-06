@@ -20,6 +20,9 @@ export default function AutoplayVideo({
   const [reducedMotion, setReducedMotion] = useState(false);
   const [pausedByUser, setPausedByUser] = useState(false);
   const userInteractedRef = useRef(false);
+  const playAttemptedRef = useRef(false);
+  const maxAttemptsReachedRef = useRef(false);
+  
   useEffect(() => {
     setReducedMotion(
       window.matchMedia("(prefers-reduced-motion: reduce)").matches
@@ -27,47 +30,83 @@ export default function AutoplayVideo({
   }, []);
 
   // Attempt autoplay whenever the component mounts or when the user toggles play.
-  // We retry a few times because some browsers (especially on refresh) block the
-  // very first play attempt but allow a second one after a user gesture or delay.
+  // We retry a few times for transient timing issues, but respect browser autoplay
+  // policies — if the browser rejects play() due to policy, we stop retrying.
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || reducedMotion) return;
+    if (!video || reducedMotion || !poster) return;
+    // Reset state for new mount/unmount cycles
+    playAttemptedRef.current = false;
+    maxAttemptsReachedRef.current = false;
 
     let attempts = 0;
     const MAX_ATTEMPTS = 3;
-    const playNext = () => {
-      if (pausedByUser || attempts >= MAX_ATTEMPTS) return;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    
+    const attemptPlay = () => {
+      // Don't attempt if user paused, we've hit max attempts, or already playing
+      if (pausedByUser || maxAttemptsReachedRef.current) return;
+      
+      // Only attempt if video is ready (has data)
+      if (video.readyState < 2) {
+        // Not ready yet, try again shortly
+        timeoutId = setTimeout(attemptPlay, 100);
+        return;
+      }
+      
+      playAttemptedRef.current = true;
       video.play().then(() => {
-        /* playing */
-      })      .catch(() => {
+        // Playing successfully — reset the max attempts flag since
+        // we may want to retry if the video pauses later
+        maxAttemptsReachedRef.current = false;
+      }).catch((err) => {
         attempts++;
-        if (attempts < MAX_ATTEMPTS) {
-          // Retry after a short delay — browsers sometimes allow play after
-          // the first blocked attempt.
-          setTimeout(playNext, 300);
+        // Distinguish between autoplay policy blocking (won't change with retries)
+        // and transient errors (might succeed on retry)
+        const isAutoplayBlocked = err.name === "NotAllowedError" || 
+          (err.message && err.message.includes("autoplay"));
+        
+        if (isAutoplayBlocked || attempts >= MAX_ATTEMPTS) {
+          // Browser policy or too many attempts — stop retrying
+          // The poster remains visible as the fallback
+          maxAttemptsReachedRef.current = true;
+        } else {
+          // Transient error — retry after a short delay
+          timeoutId = setTimeout(attemptPlay, 300);
         }
       });
     };
 
-    // Start playback after a tiny delay to let the browser finish loading the
-    // element.
-    const timer = setTimeout(playNext, 100);
-    return () => clearTimeout(timer);
-  }, [reducedMotion, pausedByUser]);
+    // Start playback attempt after a short delay to let metadata load
+    timeoutId = setTimeout(attemptPlay, 150);
+    
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [reducedMotion, pausedByUser, poster]);
 
-  // Keep playing if the user scrolls it off-screen and back.
+  // Intersection Observer controls playback, not media existence.
+  // The poster remains visible regardless of observer state.
   useEffect(() => {
     const video = videoRef.current;
-    if (!video) return;
+    if (!video || !poster) return;
 
     let observer: IntersectionObserver | null = null;
     if ("IntersectionObserver" in window) {
       observer = new IntersectionObserver(
         (entries) => {
           for (const entry of entries) {
-            if (entry.isIntersecting && !pausedByUser) {
-              video.play().catch(() => {});
+            if (entry.isIntersecting && !pausedByUser && !maxAttemptsReachedRef.current) {
+              // Video entered viewport — attempt play if not already playing
+              if (video.paused) {
+                video.play().catch(() => {
+                  // If blocked, mark that we've hit the limit so we don't
+                  // keep retrying on every intersection
+                  maxAttemptsReachedRef.current = true;
+                });
+              }
             } else if (!entry.isIntersecting) {
+              // Video left viewport — pause to save resources
               video.pause();
             }
           }
@@ -77,7 +116,7 @@ export default function AutoplayVideo({
       observer.observe(video);
     }
     return () => observer?.disconnect();
-  }, [pausedByUser]);
+  }, [pausedByUser, poster]);
 
   const handleClick = () => {
     const video = videoRef.current;
@@ -85,20 +124,24 @@ export default function AutoplayVideo({
 
     if (!userInteractedRef.current) {
       userInteractedRef.current = true;
-      if (!pausedByUser) {
-        setPausedByUser(true);
+      // First click — toggle play/pause
+      if (video.paused) {
+        video.play().catch(() => {});
+      } else {
         video.pause();
       }
+      // Update pausedByUser state to keep UI in sync
+      setPausedByUser(video.paused);
       return;
     }
 
-    if (pausedByUser) {
-      setPausedByUser(false);
+    // Subsequent clicks also toggle
+    if (video.paused) {
       video.play().catch(() => {});
     } else {
-      setPausedByUser(true);
       video.pause();
     }
+    setPausedByUser(video.paused);
   };
 
   const showControls = reducedMotion || pausedByUser;
@@ -110,7 +153,7 @@ export default function AutoplayVideo({
       muted
       loop={loop}
       playsInline
-      preload="auto"
+      preload="metadata"
       poster={poster ?? undefined}
       controls={showControls}
       onClick={handleClick}

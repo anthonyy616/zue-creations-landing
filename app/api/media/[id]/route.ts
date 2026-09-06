@@ -28,6 +28,7 @@ export async function DELETE(
       id: media.id,
       storageKey: media.storageKey,
       variants: media.variants,
+      posterKey: media.posterKey,
       slug: projects.slug,
       category: projects.category,
     })
@@ -45,7 +46,12 @@ export async function DELETE(
     return NextResponse.json({ error: "Media not found." }, { status: 404 });
   }
 
+  // Collect all R2 objects for this media item (original + variants + poster)
   const objects = getMediaObjectKeys(row.storageKey, row.variants);
+  // Also include the poster if one exists
+  if (row.posterKey) {
+    objects.push({ Key: row.posterKey });
+  }
 
   try {
     await r2.send(
