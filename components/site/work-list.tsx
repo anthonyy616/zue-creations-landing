@@ -23,9 +23,32 @@ function CoverMedia({ media }: { media: MediaView }) {
       />
     );
   }
-  if (media.status !== "ready" || !media.width || !media.height) {
-    // While processing or on failure, show the LQIP placeholder — never
-    // the raw original which can be up to 50 MB.
+  if (media.status === "processing" && media.lqipDataUrl) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={media.lqipDataUrl}
+        alt={media.altText ?? ""}
+        loading="lazy"
+        decoding="async"
+        className="h-full w-full object-cover blur-sm scale-110"
+      />
+    );
+  }
+  if (media.status === "processing") {
+    // No LQIP yet — show the original so the cover frame is not blank.
+    // The original is already in R2 (the upload just completed).
+    return (
+      <Image
+        src={loaderSrc(media.originalUrl, media.variantWidths)}
+        alt={media.altText ?? ""}
+        fill
+        sizes="(min-width: 1024px) 640px, 92vw"
+        className="object-cover transition-transform duration-700 ease-out group-hover:scale-[1.04]"
+      />
+    );
+  }
+  if (media.status === "failed") {
     if (media.lqipDataUrl) {
       return (
         // eslint-disable-next-line @next/next/no-img-element
@@ -38,6 +61,11 @@ function CoverMedia({ media }: { media: MediaView }) {
         />
       );
     }
+    return (
+      <div className="h-full w-full bg-white/[0.04]" />
+    );
+  }
+  if (!media.width || !media.height) {
     return (
       <div className="h-full w-full bg-white/[0.04]" />
     );

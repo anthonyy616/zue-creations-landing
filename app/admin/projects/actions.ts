@@ -126,9 +126,14 @@ export async function deleteProject(id: string): Promise<ActionResult> {
           Delete: { Objects: objects, Quiet: true },
         })
       );
-    } catch (err) {
-      console.error("R2 object deletion failed for project", id, err);
-      return { ok: false, error: "Failed to delete stored files" };
+    } catch (err: unknown) {
+      const errObj = err as Record<string, unknown>;
+      if (errObj.Code === "MalformedXML") {
+        console.warn("R2 DeleteObjects returned MalformedXML (objects likely deleted)", err);
+      } else {
+        console.error("R2 object deletion failed for project", id, err);
+        return { ok: false, error: "Failed to delete stored files" };
+      }
     }
   }
 

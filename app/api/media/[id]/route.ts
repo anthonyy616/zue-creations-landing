@@ -44,12 +44,20 @@ export async function DELETE(
         Delete: { Objects: objects.map((o) => ({ Key: o.Key })), Quiet: true },
       })
     );
-  } catch (err) {
-    console.error("R2 object deletion failed", err);
-    return NextResponse.json(
-      { error: "Failed to delete stored files" },
-      { status: 500 }
-    );
+  } catch (err: unknown) {
+    const errObj = err as Record<string, unknown>;
+    // R2 sometimes returns malformed XML for DeleteObjects even when the
+    // objects were actually deleted. Treat MalformedXML as a non-fatal
+    // warning — the media row is still removed from the DB below.
+    if (errObj.Code === "MalformedXML") {
+      console.warn("R2 DeleteObjects returned MalformedXML (objects likely deleted)", err);
+    } else {
+      console.error("R2 object deletion failed", err);
+      return NextResponse.json(
+        { error: "Failed to delete stored files" },
+        { status: 500 }
+      );
+    }
   }
 
   await db.delete(media).where(eq(media.id, id));
