@@ -10,7 +10,7 @@ import { revalidateProjectPublic } from "@/lib/revalidate";
 import { getMediaObjectKeys } from "@/lib/media";
 import { r2, R2_BUCKET_NAME } from "@/lib/r2";
 import { projectFormSchema } from "./schema";
-import { info, warn, error, logAndReturnError } from "@/lib/log";
+import { info, warn, error } from "@/lib/log";
 
 import type { ProjectFormValues, ActionResult } from "./schema";
 /** Converts a YYYY-MM-DD form value into a local-midnight Date (avoids timezone drift). */

@@ -13,7 +13,6 @@ interface PackagesShellProps {
   photographyRange: string;
   cinematographyRange: string;
   brandingRange: string;
-  allRange: string;
 }
 
 const TIER_LABELS: Record<PackageTier, string> = {
@@ -103,6 +102,16 @@ function PackageCard({
   );
 }
 
+const CATEGORY_LABELS: Record<
+  "photography" | "cinematography" | "branding" | "",
+  string
+> = {
+  photography: "Photography",
+  cinematography: "Cinematography",
+  branding: "Branding",
+  "": "All work",
+};
+
 export default function PackagesShell({
   photography,
   cinematography,
@@ -111,7 +120,6 @@ export default function PackagesShell({
   photographyRange,
   cinematographyRange,
   brandingRange,
-  allRange,
 }: PackagesShellProps) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [message, setMessage] = useState<string | null>(null);
@@ -151,10 +159,7 @@ export default function PackagesShell({
     }
   }
 
-  function openWhatsApp() {
-    if (!link) return;
-    window.location.href = link;
-  }
+  
 
   const counts = {
     photography: photography.filter((p) => selected.has(p.id)).length,
@@ -196,6 +201,20 @@ export default function PackagesShell({
           <span className="mono-meta text-[10px] uppercase tracking-[0.22em] text-zinc-500">
             Pick packages above, then continue to WhatsApp
           </span>
+        )}
+      </div>
+
+      {/* Category filter */}
+      <div className="flex flex-wrap gap-4 mb-10">
+        {(["photography", "cinematography", "branding", ""] as const).map(
+          (cat) => (
+            <button
+              key={cat}
+              className="cursor-pointer rounded border border-zinc-700 bg-zinc-950 px-5 py-2 text-sm text-zinc-300 transition-colors hover:border-zinc-500 hover:text-white"
+            >
+              {CATEGORY_LABELS[cat]}
+            </button>
+          )
         )}
       </div>
 

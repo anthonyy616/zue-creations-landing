@@ -1,8 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import Link from "next/link";
-import { format } from "date-fns";
+import { useState } from "react";
 import {
   DndContext,
   closestCenter,
@@ -19,10 +17,7 @@ import {
 } from "@dnd-kit/sortable";
 import {
   SortableContext,
-  useSortable,
-  type SortableContextProps,
 } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
 import type { Project } from "@/db/schema";
 import ProjectForm from "./project-form";
 import SortableProjectItem from "./sortable-project-item";
@@ -147,7 +142,6 @@ export default function ProjectsManager({
                   project={project}
                   categoryLabels={CATEGORY_LABELS}
                   busyId={busyId}
-                  reorderingId={reorderingId}
                   onDelete={handleDelete}
                 />
               ))}

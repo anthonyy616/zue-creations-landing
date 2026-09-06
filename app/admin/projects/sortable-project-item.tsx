@@ -10,7 +10,6 @@ interface SortableProjectItemProps {
   project: Project;
   categoryLabels: Record<string, string>;
   busyId: string | null;
-  reorderingId: string | null;
   onDelete: (id: string, title: string) => void;
 }
 
@@ -18,7 +17,6 @@ export default function SortableProjectItem({
   project,
   categoryLabels,
   busyId,
-  reorderingId,
   onDelete,
 }: SortableProjectItemProps) {
   const {
