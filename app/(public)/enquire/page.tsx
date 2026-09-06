@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { ArrowUpRight } from "lucide-react";
 import { ENQUIRY_FORM_URL } from "@/lib/site";
+import { Heartbeat } from "@/components/site/motion";
 
 export const metadata: Metadata = {
   title: "Enquire",
@@ -26,14 +27,16 @@ export default function EnquirePage() {
 
       <div className="py-16">
         {ENQUIRY_FORM_URL ? (
-          <a
-            href={ENQUIRY_FORM_URL}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-2 border border-line px-6 py-3 text-[11px] uppercase tracking-[0.2em] text-fg transition-colors hover:border-accent hover:text-accent"
-          >
-            Open the enquiry form <ArrowUpRight size={14} strokeWidth={1.5} />
-          </a>
+          <Heartbeat>
+            <a
+              href={ENQUIRY_FORM_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-2 border border-line px-6 py-3 text-[11px] uppercase tracking-[0.2em] text-fg transition-colors hover:border-accent hover:text-accent"
+            >
+              Open the enquiry form <ArrowUpRight size={14} strokeWidth={1.5} />
+            </a>
+          </Heartbeat>
         ) : (
           <p className="mono-meta text-[11px] uppercase tracking-[0.2em] text-muted">
             The enquiry form link is being configured.

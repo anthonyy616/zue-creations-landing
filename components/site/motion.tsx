@@ -186,6 +186,109 @@ export function PointerTilt({
 }
 
 /**
+ * Heartbeat pulse — a continuous scale pulse that mimics a beating heart.
+ * Good for CTAs like "Start a project" or "Start an enquiry".
+ * Disabled for reduced motion.
+ */
+export function Heartbeat({
+  children,
+  className = "",
+  duration = 1400,
+}: {
+  children: ReactNode;
+  className?: string;
+  duration?: number;
+}) {
+  const reduced = useReducedMotion();
+
+  if (reduced) return <div className={className}>{children}</div>;
+
+  return (
+    <motion.div
+      className={className}
+      animate={
+        {
+          scale: [
+            1,
+            1.02,
+            1,
+            1.015,
+            1,
+            1.01,
+            1,
+          ],
+          boxShadow: [
+            "0 0 0 0 rgba(245, 245, 76, 0)",
+            "0 0 0 4px rgba(245, 245, 76, 0.15)",
+            "0 0 0 0 rgba(245, 245, 76, 0)",
+            "0 0 0 3px rgba(245, 245, 76, 0.1)",
+            "0 0 0 0 rgba(245, 245, 76, 0)",
+            "0 0 0 2px rgba(245, 245, 76, 0.06)",
+            "0 0 0 0 rgba(245, 245, 76, 0)",
+          ],
+        }
+      }
+      transition={
+        {
+          duration,
+          repeat: Infinity,
+          repeatType: "loop",
+          ease: "easeInOut",
+        }
+      }
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+/**
+ * Ambient float — the element drifts slowly and continuously on its own,
+ * without needing a pointer. Good for hero headlines that should feel
+ * alive even when not hovered. Disabled for reduced motion.
+ */
+export function AmbientFloat({
+  children,
+  className = "",
+  yRange = 6,
+  xRange = 4,
+  duration = 8,
+}: {
+  children: ReactNode;
+  className?: string;
+  yRange?: number;
+  xRange?: number;
+  duration?: number;
+}) {
+  const reduced = useReducedMotion();
+
+  if (reduced) return <div className={className}>{children}</div>;
+
+  return (
+    <motion.div
+      className={className}
+      animate={
+        {
+          y: [0, `-${yRange}px`, 0, `${yRange}px`, 0],
+          x: [0, `${xRange}px`, 0, `-${xRange}px`, 0],
+        }
+      }
+      transition={
+        {
+          duration,
+          repeat: Infinity,
+          repeatType: "reverse",
+          ease: "easeInOut",
+          delay: 0.5,
+        }
+      }
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+/**
  * Magnetic pull — the child drifts 3-8 px toward the cursor on hover.
  * Good for CTAs, nav links, social icons. Touch / reduced-motion get the
  * child straight, no drift.

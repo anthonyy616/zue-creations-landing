@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { orderedPackages, priceRangeFor } from "@/lib/packages";
 import PackagesShell from "./packages-shell";
+import { Heartbeat } from "@/components/site/motion";
+import SectionDivider from "@/components/site/section-divider";
 
 export const metadata: Metadata = {
   title: "Packages",
@@ -31,15 +33,17 @@ export default async function PackagesPage() {
         </p>
       </header>
 
-      <PackagesShell
-        photography={photography}
-        cinematography={cinematography}
-        branding={branding}
-        all={all}
-        photographyRange={priceRangeFor("photography")}
-        cinematographyRange={priceRangeFor("cinematography")}
-        brandingRange={priceRangeFor("branding")}
-      />
+      <SectionDivider style="fade">
+        <PackagesShell
+          photography={photography}
+          cinematography={cinematography}
+          branding={branding}
+          all={all}
+          photographyRange={priceRangeFor("photography")}
+          cinematographyRange={priceRangeFor("cinematography")}
+          brandingRange={priceRangeFor("branding")}
+        />
+      </SectionDivider>
     </main>
   );
 }

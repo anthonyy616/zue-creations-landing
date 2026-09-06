@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ArrowUpRight, Check, Loader2 } from "lucide-react";
 import type { PackageDef, PackageTier } from "@/lib/packages";
 import { enquiryMessage, buildWhatsAppUrl } from "@/lib/whatsapp";
+import { Heartbeat } from "@/components/site/motion";
 
 interface PackagesShellProps {
   photography: PackageDef[];
@@ -314,6 +315,7 @@ export default function PackagesShell({
                 )}
               </button>
             ) : link ? (
+              <Heartbeat>
               <a
                 href={link}
                 target="_blank"
@@ -322,21 +324,24 @@ export default function PackagesShell({
               >
                 Open WhatsApp <ArrowUpRight size={14} strokeWidth={1.5} />
               </a>
+            </Heartbeat>
             ) : (
-              <button
-                type="button"
-                onClick={buildLink}
-                disabled={building}
-                className="rounded border border-accent/40 bg-accent/5 px-6 py-3 text-sm font-medium uppercase tracking-[0.18em] text-accent transition-colors hover:bg-accent/10 disabled:opacity-40"
-              >
-                {building ? (
-                  <span className="inline-flex items-center gap-2">
-                    <Loader2 size={14} className="animate-spin" /> Building…
-                  </span>
-                ) : (
-                  "Continue to WhatsApp"
-                )}
-              </button>
+              <Heartbeat>
+                <button
+                  type="button"
+                  onClick={buildLink}
+                  disabled={building}
+                  className="rounded border border-accent/40 bg-accent/5 px-6 py-3 text-sm font-medium uppercase tracking-[0.18em] text-accent transition-colors hover:bg-accent/10 disabled:opacity-40"
+                >
+                  {building ? (
+                    <span className="inline-flex items-center gap-2">
+                      <Loader2 size={14} className="animate-spin" /> Building…
+                    </span>
+                  ) : (
+                    "Continue to WhatsApp"
+                  )}
+                </button>
+              </Heartbeat>
             )}
           </div>
         </div>

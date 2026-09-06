@@ -3,6 +3,8 @@ import { ProjectRow, EmptyWork } from "./work-list";
 import MediaScroller from "./media-scroller";
 import { mediaToSlide } from "@/lib/media-slides";
 import { FadeUp, StaggerItem, StaggerList } from "./motion";
+import Counter from "./counter";
+import SectionDivider from "./section-divider";
 
 /**
  * A discipline landing page.
@@ -41,22 +43,24 @@ export default function CategoryView({
 
   return (
     <div className="mx-auto max-w-6xl px-6">
-      <FadeUp>
-        <header className="grid gap-6 border-b border-line py-14 sm:py-20 lg:grid-cols-12">
-          <h1 className="font-display text-6xl font-black uppercase leading-[0.85] tracking-tight sm:text-8xl lg:col-span-9">
-            {title}
-          </h1>
-          <div className="flex flex-col justify-end gap-4 lg:col-span-3">
-            <p className="max-w-xs text-sm leading-relaxed text-muted">{blurb}</p>
-            <p className="mono-meta text-[10px] uppercase tracking-[0.22em] text-accent">
-              {String(projects.length).padStart(2, "0")} projects
-              {slides.length > projects.length
-                ? ` · ${String(slides.length).padStart(2, "0")} frames`
-                : ""}
-            </p>
-          </div>
-        </header>
-      </FadeUp>
+      <SectionDivider style="fade">
+        <FadeUp>
+          <header className="grid gap-6 border-b border-line py-14 sm:py-20 lg:grid-cols-12">
+            <h1 className="font-display text-6xl font-black uppercase leading-[0.85] tracking-tight sm:text-8xl lg:col-span-9">
+              {title}
+            </h1>
+            <div className="flex flex-col justify-end gap-4 lg:col-span-3">
+              <p className="max-w-xs text-sm leading-relaxed text-muted">{blurb}</p>
+              <div className="flex items-end justify-end gap-6">
+                <Counter value={projects.length} label="projects" />
+                {slides.length > projects.length && (
+                  <Counter value={slides.length} label="frames" />
+                )}
+              </div>
+            </div>
+          </header>
+        </FadeUp>
+      </SectionDivider>
 
       {projects.length === 0 ? (
         <div className="py-12">
@@ -76,7 +80,11 @@ export default function CategoryView({
                   {projects.length === 1 ? "project" : "projects"}
                 </p>
               </div>
-              <MediaScroller slides={slides} mode="rail" />
+              <div className="relative">
+                {/* Meeting point glow — accent glow at the left edge of the rail */}
+                <div className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-1 h-20 bg-accent rounded-full blur-xl opacity-40" />
+                <MediaScroller slides={slides} mode="rail" />
+              </div>
             </FadeUp>
           ) : null}
 

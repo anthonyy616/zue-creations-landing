@@ -1,12 +1,14 @@
 import Link from "next/link";
 import Image from "next/image";
-import { format } from "date-fns";
 import { ArrowUpRight } from "lucide-react";
+import InstagramIcon from "./instagram-icon";
 import type { ProjectCard } from "@/lib/public";
 import type { MediaView } from "@/lib/media";
 import { loaderSrc } from "@/lib/image-loader";
 import AutoplayVideo from "./autoplay-video";
 import SafeText from "./safe-text";
+import { safeInstagramUrl } from "@/lib/sanitize";
+import { formatDateAsMonthYear } from "@/lib/format";
 
 export const CATEGORY_LABELS: Record<string, string> = {
   photography: "Photography",
@@ -98,22 +100,39 @@ export function ProjectRow({
 }) {
   const number = String(index + 1).padStart(2, "0");
   const mediaOnLeft = index % 2 === 0;
-  const year = format(project.date, "yyyy");
+  const monthYear = formatDateAsMonthYear(project.date);
 
   const meta = (
     <>
       <span className="mono-meta text-[10px] uppercase tracking-[0.22em] text-muted">
-        {CATEGORY_LABELS[project.category]} · {year}
+        {CATEGORY_LABELS[project.category]} · {monthYear}
       </span>
       <h3 className="font-display mt-3 text-2xl font-bold uppercase leading-[0.95] tracking-tight text-fg sm:text-3xl">
         <SafeText>{project.title}</SafeText>
       </h3>
+      {project.location && (
+        <p className="mt-2 text-[11px] uppercase tracking-[0.18em] text-zinc-500">
+          <SafeText>{project.location}</SafeText>
+        </p>
+      )}
       {project.description ? (
-        <p className="mt-4 line-clamp-3 max-w-md text-sm leading-relaxed text-muted">
+        <p className="mt-2 line-clamp-3 max-w-md text-sm leading-relaxed text-muted">
           <SafeText>{project.description}</SafeText>
         </p>
       ) : null}
-      <span className="mt-5 inline-flex items-center gap-1 text-[11px] font-medium uppercase tracking-[0.18em] text-accent">
+      {project.instagramUrl && safeInstagramUrl(project.instagramUrl) ? (
+        <a
+          href={safeInstagramUrl(project.instagramUrl) ?? "#"}
+          target="_blank"
+          rel="noreferrer"
+          className="mt-3 inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.18em] text-accent transition-colors hover:text-accent/80"
+          aria-label="View on Instagram"
+        >
+          <InstagramIcon size={12} strokeWidth={1.5} />
+          View on Instagram
+        </a>
+      ) : null}
+      <span className="mt-3 inline-flex items-center gap-1 text-[11px] font-medium uppercase tracking-[0.18em] text-accent">
         View project <ArrowUpRight size={13} strokeWidth={1.5} />
       </span>
     </>
@@ -123,7 +142,7 @@ export function ProjectRow({
     <Link
       href={`/work/${project.slug}`}
       data-cursor="view"
-      className="group grid gap-6 py-10 outline-none lg:grid-cols-12 lg:items-center lg:gap-x-6 focus-visible:ring-2 focus-visible:ring-accent"
+      className="group grid gap-6 py-10 outline-none lg:grid-cols-12 lg:items-center lg:gap-x-6 focus-visible:ring-2 focus-visible:ring-accent transition-all duration-500 hover:border-zinc-600 hover:shadow-[0_0_20px_-5px_rgba(245,245,76,0.08)]"
     >
         {/* Numeric index — a quiet running page number at the outer edge. */}
         <span
@@ -138,7 +157,7 @@ export function ProjectRow({
         </span>
 
         <div
-          className={`relative aspect-[4/3] w-full overflow-hidden bg-line lg:row-start-1 ${
+          className={`relative aspect-[4/3] w-full overflow-hidden bg-line lg:row-start-1 group-hover:scale-[1.02] group-hover:shadow-[0_0_15px_-3px_rgba(245,245,76,0.1)] transition-all duration-700 ease-out ${
             mediaOnLeft
               ? "lg:col-span-7 lg:col-start-2" // index (1) + media (2–8)
               : "lg:col-span-7 lg:col-start-5" // media (5–11) + index (12)
@@ -149,7 +168,7 @@ export function ProjectRow({
           ) : (
             <div className="flex h-full w-full items-center justify-center p-6 text-center">
               <span className="mono-meta text-[10px] uppercase tracking-[0.2em] text-muted">
-                {CATEGORY_LABELS[project.category]} — {year}
+                {CATEGORY_LABELS[project.category]} — {formatDateAsMonthYear(project.date)}
               </span>
             </div>
           )}

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, MessageSquare } from "lucide-react";
 import { SITE_NAME, INSTAGRAM_URL, INSTAGRAM_HANDLE } from "@/lib/site";
 import InstagramIcon from "./instagram-icon";
 import { safeInstagramUrl } from "@/lib/sanitize";
@@ -37,7 +37,7 @@ export default function SiteFooter() {
             </div>
             <div>
               <p className="mono-meta text-[10px] uppercase tracking-[0.2em] text-muted">
-                Elsewhere
+                Contact Us
               </p>
               <ul className="mt-3 space-y-2 text-sm">
                 <li>
@@ -45,19 +45,31 @@ export default function SiteFooter() {
                     Enquire <ArrowUpRight size={13} className="inline" strokeWidth={1.5} />
                   </Link>
                 </li>
-                {INSTAGRAM_URL ? (
+                {INSTAGRAM_URL && safeInstagramUrl(INSTAGRAM_URL) ? (
                   <li>
                     <a
                       href={safeInstagramUrl(INSTAGRAM_URL) ?? "#"}
                       target="_blank"
                       rel="noreferrer"
-                      className="text-muted transition-colors hover:text-accent"
+                      className="text-muted transition-colors hover:text-accent inline-flex items-center gap-1"
+                      aria-label="Open Instagram profile"
                     >
-                      <InstagramIcon size={13} className="mr-1 inline" strokeWidth={1.5} />
+                      <InstagramIcon size={13} className="shrink-0" strokeWidth={1.5} />
                       {INSTAGRAM_HANDLE || "Instagram"}
                     </a>
                   </li>
                 ) : null}
+                <li>
+                  <a
+                    href={process.env.NEXT_PUBLIC_WHATSAPP_URL ?? "#"}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-muted transition-colors hover:text-accent inline-flex items-center gap-1"
+                  >
+                    <MessageSquare size={13} className="shrink-0" strokeWidth={1.5} />
+                    WhatsApp
+                  </a>
+                </li>
               </ul>
             </div>
           </div>

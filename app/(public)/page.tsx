@@ -9,10 +9,13 @@ import {
   RevealLine,
   StaggerItem,
   StaggerList,
+  AmbientFloat,
+  Heartbeat,
 } from "@/components/site/motion";
 import Marquee from "@/components/site/marquee";
-
-export const revalidate = 60;
+import SectionDivider from "@/components/site/section-divider";
+import Counter from "@/components/site/counter";
+import HeroSpotlight from "@/components/site/hero-spotlight";export const revalidate = 60;
 
 export const metadata: Metadata = {
   alternates: { canonical: "/" },
@@ -51,15 +54,17 @@ export default async function HomePage() {
               Photography · Cinematography · Branding
             </p>
             <PointerTilt max={7} className="mt-6">
-              <h1 className="font-display text-[13vw] font-black uppercase leading-[0.86] tracking-tight text-fg sm:text-7xl md:text-8xl">
-                <RevealLine delay={0.05}>Pictures</RevealLine>
-                <RevealLine delay={0.18} driftDelay={0.7}>that feel like</RevealLine>
-                <RevealLine delay={0.31} driftDelay={1.4}>
-                  <span className="font-accent-serif font-normal normal-case tracking-tight text-accent">
-                    stories.
-                  </span>
-                </RevealLine>
-              </h1>
+              <AmbientFloat yRange={4} xRange={3} duration={9} className="inline-block">
+                <h1 className="font-display text-[13vw] font-black uppercase leading-[0.86] tracking-tight text-fg sm:text-7xl md:text-8xl">
+                  <RevealLine delay={0.05}>Pictures</RevealLine>
+                  <RevealLine delay={0.18} driftDelay={0.7}>that feel like</RevealLine>
+                  <RevealLine delay={0.31} driftDelay={1.4}>
+                    <span className="font-accent-serif font-normal normal-case tracking-tight text-accent">
+                      stories.
+                    </span>
+                  </RevealLine>
+                </h1>
+              </AmbientFloat>
             </PointerTilt>
           </div>
 
@@ -70,14 +75,21 @@ export default async function HomePage() {
                 image — selected projects, told one at a time.
               </p>
             </FadeUp>
+            {projects.length > 0 && (
+              <FadeUp delay={0.6}>
+                <HeroSpotlight projects={projects} />
+              </FadeUp>
+            )}
             <FadeUp delay={0.65}>
               <div className="flex flex-wrap items-center gap-6">
-                <Link
-                  href="/enquire"
-                  className="group/btn inline-flex items-center gap-2 border border-line px-5 py-3 text-[11px] font-medium uppercase tracking-[0.2em] text-fg transition-all duration-300 hover:border-accent hover:text-accent hover:translate-x-1"
-                >
-                  Start a project <ArrowUpRight size={14} strokeWidth={1.5} className="transition-transform duration-300 group-hover/btn:translate-x-0.5 group-hover/btn:-translate-y-0.5" />
-                </Link>
+                <Heartbeat className="group/btn">
+                  <Link
+                    href="/enquire"
+                    className="inline-flex items-center gap-2 border border-line px-5 py-3 text-[11px] font-medium uppercase tracking-[0.2em] text-fg transition-all duration-300 hover:border-accent hover:text-accent hover:translate-x-1"
+                  >
+                    Start a project <ArrowUpRight size={14} strokeWidth={1.5} className="transition-transform duration-300 group-hover/btn:translate-x-0.5 group-hover/btn:-translate-y-0.5" />
+                  </Link>
+                </Heartbeat>
                 <Link
                   href="#work"
                   className="group/link inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-muted transition-colors hover:text-fg"
@@ -101,35 +113,35 @@ export default async function HomePage() {
       {/* ------------------------------------------------------------------ */}
       {/* Selected work                                                      */}
       {/* ------------------------------------------------------------------ */}
-      <section id="work" className="mx-auto max-w-6xl scroll-mt-20 px-6">
-        <FadeUp>
-          <header className="flex items-end justify-between gap-6 pt-16">
-            <h2 className="font-display text-3xl font-black uppercase leading-none tracking-tight sm:text-4xl">
-              Selected<span className="text-accent"> work</span>
-            </h2>
-            <p className="mono-meta pb-1 text-[10px] uppercase tracking-[0.22em] text-muted">
-              {String(projects.length).padStart(2, "0")} projects
-            </p>
-          </header>
-        </FadeUp>
+      <SectionDivider style="fade">
+        <section id="work" className="mx-auto max-w-6xl scroll-mt-20 px-6">
+          <FadeUp>
+            <header className="flex items-end justify-between gap-6 pt-16">
+              <h2 className="font-display text-3xl font-black uppercase leading-none tracking-tight sm:text-4xl">
+                Selected<span className="text-accent"> work</span>
+              </h2>
+              <Counter value={projects.length} label="projects" />
+            </header>
+          </FadeUp>
 
-        {projects.length === 0 ? (
-          <div className="pt-8">
-            <EmptyWork label="Selected work is coming soon." />
-          </div>
-        ) : (
-          <StaggerList className="mt-4">
-            {projects.map((project, index) => (
-              <StaggerItem
-                key={project.id}
-                className="border-b border-line last:border-b-0"
-              >
-                <ProjectRow project={project} index={index} />
-              </StaggerItem>
-            ))}
-          </StaggerList>
-        )}
-      </section>
+          {projects.length === 0 ? (
+            <div className="pt-8">
+              <EmptyWork label="Selected work is coming soon." />
+            </div>
+          ) : (
+            <StaggerList className="mt-4">
+              {projects.map((project, index) => (
+                <StaggerItem
+                  key={project.id}
+                  className="border-b border-line last:border-b-0"
+                >
+                  <ProjectRow project={project} index={index} />
+                </StaggerItem>
+              ))}
+            </StaggerList>
+          )}
+        </section>
+      </SectionDivider>
 
       {/* ------------------------------------------------------------------ */}
       {/* Discipline index — browse by work type                             */}
@@ -192,12 +204,14 @@ export default async function HomePage() {
               Tell me about the project — a form, a few questions, and the
               right package for the work.
             </p>
-            <Link
-              href="/enquire"
-              className="mt-6 inline-flex items-center gap-2 border border-line px-6 py-3 text-[11px] font-medium uppercase tracking-[0.2em] text-fg transition-colors hover:border-accent hover:text-accent"
-            >
-              Start an enquiry <ArrowUpRight size={14} strokeWidth={1.5} />
-            </Link>
+            <Heartbeat className="mt-6">
+              <Link
+                href="/enquire"
+                className="inline-flex items-center gap-2 border border-line px-6 py-3 text-[11px] font-medium uppercase tracking-[0.2em] text-fg transition-colors hover:border-accent hover:text-accent"
+              >
+                Start an enquiry <ArrowUpRight size={14} strokeWidth={1.5} />
+              </Link>
+            </Heartbeat>
           </FadeUp>
         </div>
       </section>
