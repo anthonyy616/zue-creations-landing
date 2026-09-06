@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { ArrowUpRight, MessageSquare } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
+import WhatsAppIcon from "./whatsapp-icon";
 import { SITE_NAME, INSTAGRAM_URL, INSTAGRAM_HANDLE } from "@/lib/site";
 import InstagramIcon from "./instagram-icon";
 import { safeInstagramUrl } from "@/lib/sanitize";
@@ -59,17 +60,20 @@ export default function SiteFooter() {
                     </a>
                   </li>
                 ) : null}
-                <li>
-                  <a
-                    href={process.env.NEXT_PUBLIC_WHATSAPP_URL ?? "#"}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-muted transition-colors hover:text-accent inline-flex items-center gap-1"
-                  >
-                    <MessageSquare size={13} className="shrink-0" strokeWidth={1.5} />
-                    WhatsApp
-                  </a>
-                </li>
+                {process.env.WHATSAPP_PHONE_NUMBER || process.env.NEXT_PUBLIC_WHATSAPP_URL ? (
+                  <li>
+                    <a
+                      href={process.env.NEXT_PUBLIC_WHATSAPP_URL || `https://wa.me/${process.env.WHATSAPP_PHONE_NUMBER}?text=${encodeURIComponent("Hello")}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-muted transition-colors hover:text-accent inline-flex items-center gap-1"
+                      aria-label="Open WhatsApp"
+                    >
+                      <WhatsAppIcon size={13} className="shrink-0" strokeWidth={1.5} />
+                      WhatsApp
+                    </a>
+                  </li>
+                ) : null}
               </ul>
             </div>
           </div>

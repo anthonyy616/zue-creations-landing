@@ -9,7 +9,7 @@ import type { PackageDef } from "./packages";
  * or inferred on mobile).
  */
 
-export const DEFAULT_WA_NUMBER = (process.env.WHATSAPP_NUMBER ?? "").replace(
+export const DEFAULT_WA_NUMBER = (process.env.WHATSAPP_PHONE_NUMBER ?? "").replace(
   /[^\d]/g,
   ""
 );

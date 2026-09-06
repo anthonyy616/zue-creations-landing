@@ -15,7 +15,8 @@ import {
 import Marquee from "@/components/site/marquee";
 import SectionDivider from "@/components/site/section-divider";
 import Counter from "@/components/site/counter";
-import HeroSpotlight from "@/components/site/hero-spotlight";export const revalidate = 60;
+// import HeroSpotlight from "@/components/site/hero-spotlight";
+export const revalidate = 60;
 
 export const metadata: Metadata = {
   alternates: { canonical: "/" },
@@ -75,11 +76,7 @@ export default async function HomePage() {
                 image — selected projects, told one at a time.
               </p>
             </FadeUp>
-            {projects.length > 0 && (
-              <FadeUp delay={0.6}>
-                <HeroSpotlight projects={projects} />
-              </FadeUp>
-            )}
+
             <FadeUp delay={0.65}>
               <div className="flex flex-wrap items-center gap-6">
                 <Heartbeat className="group/btn">

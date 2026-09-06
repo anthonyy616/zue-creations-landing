@@ -18,9 +18,13 @@ export const CATEGORY_LABELS: Record<string, string> = {
 
 function CoverMedia({ media }: { media: MediaView }) {
   if (media.type === "video") {
+    // Extract a poster frame from the video URL path so the video always shows
+    // something even before it loads or if autoplay is blocked.
+    const posterSrc = media.originalUrl.replace(/\.mp4$/i, ".jpg");
     return (
       <AutoplayVideo
         src={media.url}
+        poster={posterSrc}
         label={media.altText ?? "Video preview"}
         className="h-full w-full object-cover"
       />
