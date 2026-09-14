@@ -28,6 +28,9 @@ function normalizeValues(values: ProjectFormValues) {
     instagramUrl: values.instagramUrl || null,
     featured: values.featured ?? false,
     sortOrder: values.sortOrder ?? 0,
+    published: values.published ?? true,
+    seoTitle: values.seoTitle || null,
+    seoDescription: values.seoDescription || null,
   };
 }
 

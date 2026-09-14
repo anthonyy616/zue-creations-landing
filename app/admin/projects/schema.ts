@@ -34,6 +34,9 @@ export const projectFormSchema = z.object({
     ),
   featured: z.boolean().optional(),
   sortOrder: z.coerce.number().int().optional(),
+  published: z.boolean().optional(),
+  seoTitle: z.string().trim().max(200).optional(),
+  seoDescription: z.string().trim().max(300).optional(),
 });
 
 export type ProjectFormValues = z.infer<typeof projectFormSchema>;

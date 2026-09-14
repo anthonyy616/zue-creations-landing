@@ -35,6 +35,9 @@ function toFormValues(project?: Project): ProjectFormValues {
     instagramUrl: project?.instagramUrl ?? "",
     featured: project?.featured ?? false,
     sortOrder: project?.sortOrder ?? 0,
+    published: project?.published ?? true,
+    seoTitle: project?.seoTitle ?? "",
+    seoDescription: project?.seoDescription ?? "",
   };
 }
 
@@ -219,6 +222,15 @@ export default function ProjectForm({
           />
           Featured
         </label>
+        <label className="flex cursor-pointer items-center gap-2 text-sm text-zinc-300">
+          <input
+            type="checkbox"
+            checked={values.published ?? true}
+            onChange={(e) => setField("published", e.target.checked)}
+            className="h-4 w-4 accent-zinc-100"
+          />
+          Published (visible on the public site)
+        </label>
         <label className="flex items-center gap-2 text-sm text-zinc-300">
           Sort order
           <input
@@ -229,6 +241,38 @@ export default function ProjectForm({
           />
         </label>
       </div>
+
+      <fieldset className="rounded border border-zinc-700 p-4">
+        <legend className="px-1 text-xs uppercase tracking-wide text-zinc-500">
+          SEO
+        </legend>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label htmlFor="seoTitle" className={labelClass}>
+              SEO title
+            </label>
+            <input
+              id="seoTitle"
+              className={inputClass}
+              value={values.seoTitle ?? ""}
+              onChange={(e) => setField("seoTitle", e.target.value)}
+              placeholder="Falls back to the project title"
+            />
+          </div>
+          <div>
+            <label htmlFor="seoDescription" className={labelClass}>
+              SEO description
+            </label>
+            <input
+              id="seoDescription"
+              className={inputClass}
+              value={values.seoDescription ?? ""}
+              onChange={(e) => setField("seoDescription", e.target.value)}
+              placeholder="Falls back to the project description"
+            />
+          </div>
+        </div>
+      </fieldset>
 
       <div className="flex items-center gap-3 pt-2">
         <button

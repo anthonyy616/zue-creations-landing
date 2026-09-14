@@ -15,6 +15,9 @@ import { FadeUp } from "@/components/site/motion";
 import { CATEGORY_LABELS } from "@/components/site/work-list";
 import SafeText from "@/components/site/safe-text";
 import { safeInstagramUrl, sanitizeText } from "@/lib/sanitize";
+import { publicMediaUrl } from "@/lib/r2";
+import type { Project } from "@/db/schema";
+import type { MediaView } from "@/lib/media";
 
 export const revalidate = 60;
 
@@ -35,25 +38,89 @@ export async function generateMetadata({
   if (!project) return { title: "Project not found" };
 
   const mediaViews = await getProjectMediaViews(project.id);
-  const firstImage = mediaViews.find((m) => m.type === "image");
+  // Social image: OG override -> any image -> video poster (plan Phase 13).
+  const ogMedia =
+    mediaViews.find((m) => m.type === "image") ??
+    mediaViews.find((m) => m.type === "video" && m.posterUrl) ?? null;
+  const ogImage = project.ogImageKey
+    ? publicMediaUrl(project.ogImageKey)
+    : ogMedia
+      ? ogMedia.type === "image"
+        ? ogMedia.url
+        : ogMedia.posterUrl
+      : null;
+
+  const title = project.seoTitle || project.title;
+  const description =
+    project.seoDescription ||
+    project.description ||
+    `${CATEGORY_LABELS[project.category]} project from ${format(project.date, "yyyy")}.`;
 
   return {
-    title: project.title,
-    description:
-      project.description ??
-      `${CATEGORY_LABELS[project.category]} project from ${format(project.date, "yyyy")}.`,
+    title,
+    description,
     alternates: { canonical: `/work/${slug}` },
     openGraph: {
       type: "article",
-      title: project.title,
-      description:
-        project.description ??
-        `${CATEGORY_LABELS[project.category]} project from ${format(project.date, "yyyy")}.`,
-      images: firstImage
-        ? [{ url: firstImage.url, width: firstImage.width ?? undefined, height: firstImage.height ?? undefined }]
+      title,
+      description,
+      url: `/work/${slug}`,
+      images: ogImage
+        ? [{ url: ogImage }]
         : undefined,
     },
+    twitter: {
+      card: ogImage ? "summary_large_image" : "summary",
+      title,
+      description,
+      images: ogImage ? [ogImage] : undefined,
+    },
   };
+}
+
+/** ISO-8601 duration for VideoObject, e.g. PT1M30S. Returns null when unknown. */
+function isoDuration(seconds: number | null): string | null {
+  if (!seconds || seconds <= 0) return null;
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.round(seconds % 60);
+  return `PT${h ? `${h}H` : ""}${m ? `${m}M` : ""}${s || (!h && !m) ? `${s}S` : ""}`;
+}
+
+/**
+ * VideoObject JSON-LD (plan Phase 13 / media-rules.md §21): generated only
+ * from real CMS data, only for published projects with READY video that has
+ * a title and poster — never fake fields for missing data.
+ */
+function VideoObjectJsonLd({
+  project,
+  video,
+}: {
+  project: Project;
+  video: MediaView;
+}) {
+  if (!video.posterUrl || !(video.title || project.title)) return null;
+  const duration = isoDuration(video.durationSeconds);
+
+  const data: Record<string, unknown> = {
+    "@context": "https://schema.org",
+    "@type": "VideoObject",
+    name: video.seoTitle || video.title || project.title,
+    description:
+      video.seoDescription || video.description || project.description || project.title,
+    thumbnailUrl: [video.posterUrl],
+    uploadDate: (video.publishedAt ?? project.publishedAt ?? project.createdAt ?? new Date()).toISOString(),
+    embedUrl: video.streamEmbedUrl ?? undefined,
+  };
+  if (duration) data.duration = duration;
+
+  return (
+    <script
+      type="application/ld+json"
+      // JSON.stringify output is safe structured data; sanitize is applied upstream.
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(data).replace(/</g, "\\u003c") }}
+    />
+  );
 }
 
 
@@ -66,8 +133,14 @@ export default async function WorkPage({ params }: { params: Promise<Params> }) 
   const categoryHref = `/${project.category}`;
   const year = format(project.date, "yyyy");
 
+  // Structured data: first READY video with enough metadata (media-rules.md §21).
+  const seoVideo = mediaViews.find(
+    (m) => m.type === "video" && m.provider === "cloudflare_stream" && m.posterUrl
+  );
+
   return (
     <article>
+      {seoVideo ? <VideoObjectJsonLd project={project} video={seoVideo} /> : null}
       {/* Back + category link */}
       <div className="border-b border-line">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
