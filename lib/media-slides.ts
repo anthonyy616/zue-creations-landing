@@ -20,7 +20,7 @@ export type MediaSlide = {
   /** Where clicking a rail tile navigates. */
   href?: string;
   /** Processing status: "processing" | "ready" | "failed". */
-  status: "processing" | "ready" | "failed";
+  status: "processing" | "ready" | "failed" | "uploading" | "published" | "unpublished" | "deleted";
   /** Inline base64 data URL for a tiny blurred placeholder. */
   lqipDataUrl: string | null;
   /** Poster URL for videos (the guaranteed visual fallback). */

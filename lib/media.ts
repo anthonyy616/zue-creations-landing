@@ -2,6 +2,7 @@ import { asc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { media, type Media } from "@/db/schema";
 import { publicMediaUrl } from "@/lib/r2";
+import { streamThumbnailUrl, streamEmbedUrl } from "@/lib/stream";
 import type { VariantMap } from "@/lib/image";
 
 export async function getMediaByProject(projectId: string): Promise<Media[]> {
@@ -46,7 +47,11 @@ export function pickDisplayVariant(variants: VariantMap | null) {
 export type MediaView = {
   id: string;
   type: "image" | "video";
-  /** Preferred display URL (md variant for images, original for video). */
+  /** "r2" | "cloudflare_stream". */
+  provider: "r2" | "cloudflare_stream";
+  /** Stable Stream UID for Stream videos; R2 object key conceptually for images. */
+  providerAssetId: string | null;
+  /** Preferred display URL (md variant for images, original for legacy R2 video). */
   url: string;
   /** Public URL of the original object (images only; for the image loader). */
   originalUrl: string;
@@ -57,13 +62,52 @@ export type MediaView = {
   fileSizeBytes: number | null;
   altText: string | null;
   sortOrder: number;
-  /** Processing status: "processing" | "ready" | "failed". */
-  status: "processing" | "ready" | "failed";
+  /** Lifecycle status (see db/schema.ts media_status enum). */
+  status: "processing" | "ready" | "failed" | "uploading" | "published" | "unpublished" | "deleted";
   /** Inline base64 data URL for a tiny blurred placeholder. */
   lqipDataUrl: string | null;
-  /** Public URL of the generated poster frame (videos only; null if not generated). */
+  /** Public URL of the generated poster frame (legacy R2 videos; null if not generated). */
   posterUrl: string | null;
+  /* --- video-only fields --- */
+  title: string | null;
+  description: string | null;
+  durationSeconds: number | null;
+  aspectRatio: string | null;
+  previewEnabled: boolean;
+  previewStartSeconds: number;
+  previewDurationSeconds: number;
+  seoTitle: string | null;
+  seoDescription: string | null;
+  publishedAt: Date | null;
+  customPosterUrl: string | null;
+  /** Derived Stream thumbnail (client-safe; built server-side from env). */
+  streamThumbnailUrl: string | null;
+  /** Derived Stream embed URL (only mounted after explicit click). */
+  streamEmbedUrl: string | null;
 };
+
+/** Public-safe display fields shared by every media view. */
+function baseViewFields(row: Media, status: MediaView["status"]) {
+  return {
+    width: row.width,
+    height: row.height,
+    fileSizeBytes: row.fileSizeBytes,
+    altText: row.altText,
+    sortOrder: row.sortOrder ?? 0,
+    status,
+    lqipDataUrl: row.lqipDataUrl ?? null,
+    title: row.title,
+    description: row.description,
+    durationSeconds: row.durationSeconds,
+    aspectRatio: row.aspectRatio,
+    previewEnabled: row.previewEnabled,
+    previewStartSeconds: row.previewStartSeconds,
+    previewDurationSeconds: row.previewDurationSeconds,
+    seoTitle: row.seoTitle,
+    seoDescription: row.seoDescription,
+    publishedAt: row.publishedAt,
+  };
+}
 
 /** Builds a client-friendly view with an absolute display URL resolved from stored keys. */
 export function buildMediaView(row: Media): MediaView {
@@ -72,21 +116,43 @@ export function buildMediaView(row: Media): MediaView {
   const status = (row.status as MediaView["status"]) ?? "ready";
 
   if (row.type === "video") {
-    const posterUrl = row.posterKey ? publicMediaUrl(row.posterKey) : null;
+    const customPosterUrl = row.customPosterKey ? publicMediaUrl(row.customPosterKey) : null;
+    const legacyPosterUrl = row.posterKey ? publicMediaUrl(row.posterKey) : null;
+
+    if (row.provider === "cloudflare_stream" && row.providerAssetId) {
+      const view: MediaView = {
+        id: row.id,
+        type: "video",
+        provider: "cloudflare_stream",
+        providerAssetId: row.providerAssetId,
+        url: "",
+        originalUrl: "",
+        variantWidths: [],
+        ...baseViewFields(row, status),
+        posterUrl: customPosterUrl ?? legacyPosterUrl,
+        customPosterUrl,
+        streamThumbnailUrl: streamThumbnailUrl(row.providerAssetId, {
+          time: row.previewStartSeconds || undefined,
+        }),
+        streamEmbedUrl: streamEmbedUrl(row.providerAssetId),
+      };
+      return view;
+    }
+
+    // Legacy R2-hosted video (existing uploads keep working).
     const view: MediaView = {
       id: row.id,
       type: "video",
+      provider: "r2",
+      providerAssetId: storageKey || null,
       url: originalUrl,
       originalUrl,
       variantWidths: [],
-      width: row.width,
-      height: row.height,
-      fileSizeBytes: row.fileSizeBytes,
-      altText: row.altText,
-      sortOrder: row.sortOrder ?? 0,
-      status,
-      lqipDataUrl: row.lqipDataUrl ?? null,
-      posterUrl,
+      ...baseViewFields(row, status),
+      posterUrl: customPosterUrl ?? legacyPosterUrl,
+      customPosterUrl,
+      streamThumbnailUrl: null,
+      streamEmbedUrl: null,
     };
     return view;
   }
@@ -103,17 +169,16 @@ export function buildMediaView(row: Media): MediaView {
   const view: MediaView = {
     id: row.id,
     type: "image",
+    provider: "r2",
+    providerAssetId: storageKey || null,
     url: display ? publicMediaUrl(display.webpKey) : originalUrl,
     originalUrl,
     variantWidths,
-    width: display?.width ?? row.width,
-    height: display?.height ?? row.height,
-    fileSizeBytes: row.fileSizeBytes,
-    altText: row.altText,
-    sortOrder: row.sortOrder ?? 0,
-    status,
-    lqipDataUrl: row.lqipDataUrl ?? null,
+    ...baseViewFields(row, status),
     posterUrl: null,
+    customPosterUrl: null,
+    streamThumbnailUrl: null,
+    streamEmbedUrl: null,
   };
   return view;
 }
