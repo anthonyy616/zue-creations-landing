@@ -5,6 +5,7 @@ import { getProjectById } from "@/lib/projects";
 import { getMediaByProject, buildMediaView } from "@/lib/media";
 import ProjectForm from "../project-form";
 import MediaManager from "../media-manager";
+import VideoManager from "../video-manager";
 
 export const dynamic = "force-dynamic";
 
@@ -33,10 +34,23 @@ export default async function AdminProjectEditPage({
         <section className="mb-10 rounded-lg border border-zinc-800 bg-zinc-900 p-6">
           <ProjectForm project={project} backHref="/admin/projects" />
         </section>
+        <section className="mb-10 rounded-lg border border-zinc-800 bg-zinc-900 p-6">
+          <VideoManager
+            projectId={project.id}
+            videos={mediaRows.map(buildMediaView).filter(
+              (m) =>
+                m.type === "video" &&
+                // Only Stream-backed videos belong here; legacy R2 videos stay in MediaManager.
+                m.provider === "cloudflare_stream"
+            )}
+          />
+        </section>
         <section className="rounded-lg border border-zinc-800 bg-zinc-900 p-6">
           <MediaManager
             projectId={project.id}
-            initialMedia={mediaRows.map(buildMediaView)}
+            initialMedia={mediaRows.map(buildMediaView).filter(
+              (m) => m.type === "image" || m.provider !== "cloudflare_stream"
+            )}
           />
         </section>
       </div>
