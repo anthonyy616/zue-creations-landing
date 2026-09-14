@@ -67,7 +67,8 @@ export type MediaView = {
 
 /** Builds a client-friendly view with an absolute display URL resolved from stored keys. */
 export function buildMediaView(row: Media): MediaView {
-  const originalUrl = publicMediaUrl(row.storageKey);
+  const storageKey = row.storageKey ?? "";
+  const originalUrl = storageKey ? publicMediaUrl(storageKey) : "";
   const status = (row.status as MediaView["status"]) ?? "ready";
 
   if (row.type === "video") {

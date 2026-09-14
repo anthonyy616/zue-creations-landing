@@ -169,7 +169,7 @@ export async function deleteProject(id: string): Promise<ActionResult> {
 
   if (mediaRows.length > 0) {
     const objects = mediaRows.flatMap((row) =>
-      getMediaObjectKeys(row.storageKey, row.variants)
+      row.storageKey ? getMediaObjectKeys(row.storageKey, row.variants) : []
     );
     try {
       await r2.send(

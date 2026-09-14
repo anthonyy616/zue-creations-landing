@@ -87,7 +87,7 @@ export async function POST(request: Request) {
   // Kick off variant generation after the response.
   after(async () => {
     try {
-      const result = await generateImageVariants(row.storageKey);
+      const result = await generateImageVariants(row.storageKey!);
       await db
         .update(media)
         .set({

@@ -10,7 +10,15 @@ import {
   index,
 } from "drizzle-orm/pg-core";
 
-export const mediaStatusEnum = pgEnum("media_status", ["processing", "ready", "failed"]);
+export const mediaStatusEnum = pgEnum("media_status", [
+  "processing",
+  "ready",
+  "failed",
+  "uploading",
+  "published",
+  "unpublished",
+  "deleted",
+]);
 
 export const categoryEnum = pgEnum("category", [
   "photography",
@@ -19,6 +27,8 @@ export const categoryEnum = pgEnum("category", [
 ]);
 
 export const mediaTypeEnum = pgEnum("media_type", ["image", "video"]);
+
+export const mediaProviderEnum = pgEnum("media_provider", ["r2", "cloudflare_stream"]);
 
 export const projects = pgTable(
   "projects",
@@ -35,6 +45,11 @@ export const projects = pgTable(
     sortOrder: integer("sort_order").default(0),
     createdAt: timestamp("created_at").defaultNow(),
     updatedAt: timestamp("updated_at").defaultNow(),
+    published: boolean("published").default(true).notNull(),
+    publishedAt: timestamp("published_at"),
+    seoTitle: varchar("seo_title", { length: 200 }),
+    seoDescription: varchar("seo_description", { length: 300 }),
+    ogImageKey: varchar("og_image_key", { length: 500 }),
   },
   (table) => [
     index("projects_category_idx").on(table.category),
@@ -50,7 +65,11 @@ export const media = pgTable(
       .references(() => projects.id, { onDelete: "cascade" })
       .notNull(),
     type: mediaTypeEnum("type").notNull(),
-    storageKey: varchar("storage_key", { length: 500 }).notNull(),
+    provider: mediaProviderEnum("provider").default("r2").notNull(),
+    /** R2 object key (images + custom posters) or Cloudflare Stream UID (videos). */
+    providerAssetId: varchar("provider_asset_id", { length: 500 }),
+    /** Legacy/original R2 key; null for Stream-backed videos. */
+    storageKey: varchar("storage_key", { length: 500 }),
     variants: text("variants"),
     altText: varchar("alt_text", { length: 300 }),
     sortOrder: integer("sort_order").default(0),
@@ -60,9 +79,27 @@ export const media = pgTable(
     status: mediaStatusEnum("status").default("processing").notNull(),
     lqipDataUrl: text("lqip_data_url"),
     posterKey: varchar("poster_key", { length: 500 }),
+    customPosterKey: varchar("custom_poster_key", { length: 500 }),
+    title: varchar("title", { length: 200 }),
+    description: text("description"),
+    durationSeconds: integer("duration_seconds"),
+    aspectRatio: varchar("aspect_ratio", { length: 20 }),
+    previewEnabled: boolean("preview_enabled").default(false).notNull(),
+    previewStartSeconds: integer("preview_start_seconds").default(0).notNull(),
+    previewDurationSeconds: integer("preview_duration_seconds").default(4).notNull(),
+    seoTitle: varchar("seo_title", { length: 200 }),
+    seoDescription: varchar("seo_description", { length: 300 }),
+    publishedAt: timestamp("published_at"),
+    deletedAt: timestamp("deleted_at"),
+    deletedBy: uuid("deleted_by"),
     createdAt: timestamp("created_at").defaultNow(),
+    updatedAt: timestamp("updated_at").defaultNow(),
   },
-  (table) => [index("media_project_id_idx").on(table.projectId)]
+  (table) => [
+    index("media_project_id_idx").on(table.projectId),
+    index("media_provider_asset_id_idx").on(table.providerAssetId),
+    index("media_status_idx").on(table.status),
+  ]
 );
 
 export const adminUsers = pgTable("admin_users", {

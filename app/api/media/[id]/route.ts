@@ -47,7 +47,7 @@ export async function DELETE(
   }
 
   // Collect all R2 objects for this media item (original + variants + poster)
-  const objects = getMediaObjectKeys(row.storageKey, row.variants);
+  const objects = row.storageKey ? getMediaObjectKeys(row.storageKey, row.variants) : [];
   // Also include the poster if one exists
   if (row.posterKey) {
     objects.push({ Key: row.posterKey });
