@@ -7,6 +7,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { MediaSlide } from "@/lib/media-slides";
 import { loaderSrc } from "@/lib/image-loader";
 import AutoplayVideo from "./autoplay-video";
+import StreamVideoFrame from "./stream-video-frame";
 
 /* -------------------------------------------------------------------------- */
 /* The scroller                                                               */
@@ -27,7 +28,11 @@ function TileMedia({
   eager: boolean;
 }) {
   if (slide.kind === "video") {
-    // Use the poster URL if available — it's the guaranteed visual fallback
+    // Stream-backed videos: poster-first frame with click-to-play.
+    if (slide.provider === "cloudflare_stream") {
+      return <StreamVideoFrame slide={slide} mode={mode} />;
+    }
+    // Legacy R2 videos: existing inline player (unchanged).
     return (
       <AutoplayVideo
         src={slide.src}
@@ -415,7 +420,9 @@ export default function MediaScroller({
                   className="flex w-full shrink-0 snap-start flex-col"
                 >
                   <div className="relative flex h-[clamp(300px,58vh,640px)] w-full select-none items-center justify-center overflow-hidden bg-white/[0.04] transition-transform duration-700 ease-out hover:scale-[1.02]">
-                    {slide.kind === "video" ? (
+                    {slide.kind === "video" && slide.provider === "cloudflare_stream" ? (
+                      <StreamVideoFrame slide={slide} mode={mode} contain />
+                    ) : slide.kind === "video" ? (
                       <AutoplayVideo
                         src={slide.src}
                         label={slide.alt ?? slide.label ?? "Video"}

@@ -25,6 +25,12 @@ export type MediaSlide = {
   lqipDataUrl: string | null;
   /** Poster URL for videos (the guaranteed visual fallback). */
   poster: string | null;
+  /** Media provider: legacy R2 assets vs Cloudflare Stream videos. */
+  provider: "r2" | "cloudflare_stream";
+  /** Stable Stream UID (Stream videos only). */
+  providerAssetId: string | null;
+  /** Stream embed URL — the full player mounts only after explicit click. */
+  embedUrl: string | null;
 };
 
 /** Builds a serializable slide from a MediaView, optionally tagged with its project. */
@@ -44,5 +50,8 @@ export function mediaToSlide(
     status: media.status,
     lqipDataUrl: media.lqipDataUrl,
     poster: media.posterUrl,
+    provider: media.provider,
+    providerAssetId: media.providerAssetId,
+    embedUrl: media.streamEmbedUrl,
   };
 }

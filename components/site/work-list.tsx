@@ -5,6 +5,7 @@ import InstagramIcon from "./instagram-icon";
 import type { ProjectCard } from "@/lib/public";
 import type { MediaView } from "@/lib/media";
 import { loaderSrc } from "@/lib/image-loader";
+import VideoCard from "./video-card";
 import AutoplayVideo from "./autoplay-video";
 import SafeText from "./safe-text";
 import { safeInstagramUrl } from "@/lib/sanitize";
@@ -16,7 +17,19 @@ export const CATEGORY_LABELS: Record<string, string> = {
   branding: "Branding",
 };
 
-function CoverMedia({ media }: { media: MediaView }) {
+function CoverMedia({ media, projectTitle }: { media: MediaView; projectTitle: string }) {
+  // Stream-backed videos render as poster cards (media-rules.md §4–8):
+  // zero video bytes on page load, preview only when eligible, full player
+  // only after click. Legacy R2 videos keep the existing inline player.
+  if (media.type === "video" && media.provider === "cloudflare_stream") {
+    return (
+      <VideoCard
+        media={media}
+        projectTitle={projectTitle}
+        className="h-full w-full"
+      />
+    );
+  }
   if (media.type === "video") {
     // Use the actual generated poster URL if available.
     // The poster is the guaranteed visual fallback — the video\r
@@ -168,7 +181,7 @@ export function ProjectRow({
           }`}
         >
           {project.cover ? (
-            <CoverMedia media={project.cover} />
+            <CoverMedia media={project.cover} projectTitle={project.title} />
           ) : (
             <div className="flex h-full w-full items-center justify-center p-6 text-center">
               <span className="mono-meta text-[10px] uppercase tracking-[0.2em] text-muted">

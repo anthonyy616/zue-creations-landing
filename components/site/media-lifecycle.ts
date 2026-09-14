@@ -29,7 +29,6 @@ type Registration = {
 };
 
 const NEAR_ROOT_MARGIN = "800px 0px";
-const VISIBLE_ROOT_MARGIN = "0px 0px";
 
 let observer: IntersectionObserver | null = null;
 const registrations = new Map<Element, Registration>();
