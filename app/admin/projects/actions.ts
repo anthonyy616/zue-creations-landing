@@ -10,6 +10,7 @@ import { revalidateProjectPublic } from "@/lib/revalidate";
 import { getMediaObjectKeys } from "@/lib/media";
 import { r2, R2_BUCKET_NAME } from "@/lib/r2";
 import { projectFormSchema } from "./schema";
+import { guardPublishTransition } from "@/lib/publish-guards";
 import { info, warn, error } from "@/lib/log";
 
 import type { ProjectFormValues, ActionResult } from "./schema";
@@ -70,6 +71,9 @@ export async function createProject(
     return { ok: false, error: "A project with this web address already exists. Try a different one." };
   }
 
+  // Publish guard (plan Phase 16): media cannot exist before creation, so
+  // only title/slug can block here; the media checks apply on every save.
+
   try {
     const [created] = await db.insert(projects).values(data).returning();
     info("createProject: project created", { operation: "project.create", context: { projectId: created.id, slug: created.slug } });
@@ -117,6 +121,23 @@ export async function updateProject(
       status: 400,
     });
     return { ok: false, error: "Another project already uses this web address. Try a different one." };
+  }
+
+  // Publish guard (plan Phase 16): block going public with missing content
+  // or media that is still uploading/processing/failed.
+  if (data.published) {
+    const guard = await guardPublishTransition(id, true, {
+      title: data.title,
+      slug: data.slug,
+    });
+    if (!guard.ok) {
+      warn("updateProject: publish blocked by guard", undefined, {
+        operation: "project.update",
+        context: { projectId: id, reason: guard.reason },
+        status: 409,
+      });
+      return { ok: false, error: guard.reason };
+    }
   }
 
   try {
