@@ -2,7 +2,7 @@ import { asc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { media, type Media } from "@/db/schema";
 import { publicMediaUrl } from "@/lib/r2";
-import { streamThumbnailUrl, streamEmbedUrl } from "@/lib/stream";
+import { streamThumbnailUrl, streamEmbedUrl, streamPreviewUrl } from "@/lib/stream";
 import type { VariantMap } from "@/lib/image";
 
 export async function getMediaByProject(projectId: string): Promise<Media[]> {
@@ -84,6 +84,8 @@ export type MediaView = {
   streamThumbnailUrl: string | null;
   /** Derived Stream embed URL (only mounted after explicit click). */
   streamEmbedUrl: string | null;
+  /** Derived lightweight animated preview (only used when admin enabled previews). */
+  streamPreviewUrl: string | null;
 };
 
 /** Public-safe display fields shared by every media view. */
@@ -129,12 +131,23 @@ export function buildMediaView(row: Media): MediaView {
         originalUrl: "",
         variantWidths: [],
         ...baseViewFields(row, status),
-        posterUrl: customPosterUrl ?? legacyPosterUrl,
+        // Poster priority (architecture.md §13): custom R2 poster -> Stream
+        // thumbnail -> legacy generated poster -> null (component fallback).
+        posterUrl:
+          customPosterUrl ??
+          streamThumbnailUrl(row.providerAssetId, {
+            time: row.previewStartSeconds || undefined,
+          }) ??
+          legacyPosterUrl,
         customPosterUrl,
         streamThumbnailUrl: streamThumbnailUrl(row.providerAssetId, {
           time: row.previewStartSeconds || undefined,
         }),
         streamEmbedUrl: streamEmbedUrl(row.providerAssetId),
+        streamPreviewUrl: streamPreviewUrl(
+          row.providerAssetId,
+          row.previewDurationSeconds || 4
+        ),
       };
       return view;
     }
@@ -149,10 +162,12 @@ export function buildMediaView(row: Media): MediaView {
       originalUrl,
       variantWidths: [],
       ...baseViewFields(row, status),
+      // Same poster priority for legacy videos (custom R2 poster first).
       posterUrl: customPosterUrl ?? legacyPosterUrl,
       customPosterUrl,
       streamThumbnailUrl: null,
       streamEmbedUrl: null,
+      streamPreviewUrl: null,
     };
     return view;
   }
@@ -179,6 +194,7 @@ export function buildMediaView(row: Media): MediaView {
     customPosterUrl: null,
     streamThumbnailUrl: null,
     streamEmbedUrl: null,
+    streamPreviewUrl: null,
   };
   return view;
 }

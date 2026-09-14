@@ -154,6 +154,7 @@ export default function VideoManager({
           customPosterUrl: null,
           streamThumbnailUrl: null,
           streamEmbedUrl: null,
+          streamPreviewUrl: null,
         },
       ]);
       setUpload({ mediaId: session.mediaId, fileName: file.name, progress: 0 });
