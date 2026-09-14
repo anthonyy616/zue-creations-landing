@@ -65,7 +65,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const { projectId, fileName, fileSizeBytes, fileType } = parsed.data;
+  const { projectId, fileName, fileSizeBytes } = parsed.data;
 
   const [project] = await db
     .select({ id: projects.id, slug: projects.slug, category: projects.category })
