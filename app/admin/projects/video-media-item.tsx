@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, Loader2, CheckCircle2 } from "lucide-react";
+import { ChevronDown, Loader2, RefreshCw } from "lucide-react";
 import type { MediaView } from "@/lib/media";
 import { StatusBadge, TrashButton } from "./video-manager";
 
@@ -15,14 +15,17 @@ export function VideoMediaItem({
   onPatched,
   onDelete,
   deleting,
+  onCheckStatus,
 }: {
   item: MediaView;
   onPatched: (m: MediaView) => void;
   onDelete: (id: string) => void;
   deleting: boolean;
+  onCheckStatus: () => Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [checking, setChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [title, setTitle] = useState(item.title ?? "");
@@ -47,6 +50,17 @@ export function VideoMediaItem({
   const showMarkReady = item.status === "processing" || item.status === "uploading" || item.status === "failed";
   const showHideToggle =
     item.status === "ready" || item.status === "published" || item.status === "unpublished";
+
+  /** Polls Cloudflare (via backend) for the current video status. */
+  async function handleCheckStatus() {
+    setChecking(true);
+    setError(null);
+    try {
+      await onCheckStatus();
+    } finally {
+      setChecking(false);
+    }
+  }
 
   async function setStatus(next: "ready" | "failed" | "unpublished") {
     setSaving(true);
@@ -126,7 +140,8 @@ export function VideoMediaItem({
           ) : null}
           {publishBlocked ? (
             <p className="text-[11px] text-amber-400/80">
-              Mark it READY below once Cloudflare shows the video as ready.
+              The app checks Cloudflare automatically — or use “Check status”
+              below once the video is ready in the dashboard.
             </p>
           ) : null}
         </div>
@@ -155,8 +170,19 @@ export function VideoMediaItem({
 
           <div className="flex flex-wrap items-center gap-2 rounded border border-zinc-800 p-3">
             <p className="w-full text-[11px] uppercase tracking-wide text-zinc-500">
-              Manual video state
+              Processing status
             </p>
+            {publishBlocked ? (
+              <button
+                type="button"
+                onClick={handleCheckStatus}
+                disabled={checking}
+                className="flex items-center gap-1.5 rounded border border-zinc-700 px-3 py-1.5 text-xs text-zinc-200 hover:border-zinc-500 disabled:opacity-50"
+              >
+                <RefreshCw size={13} className={checking ? "animate-spin" : ""} />
+                {checking ? "Checking…" : "Check status"}
+              </button>
+            ) : null}
             {showMarkReady ? (
               <>
                 <button
@@ -165,7 +191,7 @@ export function VideoMediaItem({
                   disabled={saving}
                   className="flex items-center gap-1.5 rounded bg-green-600/80 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-600 disabled:opacity-50"
                 >
-                  <CheckCircle2 size={13} /> Mark READY (visible on site)
+                  Mark READY (override)
                 </button>
                 <button
                   type="button"

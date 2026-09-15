@@ -1,22 +1,44 @@
 "use client";
 
-import { useState } from "react";
-import { Film, Trash2, AlertTriangle, Plus, Loader2 } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  UploadCloud,
+  Loader2,
+  Film,
+  Trash2,
+  RotateCcw,
+  AlertTriangle,
+  RefreshCw,
+} from "lucide-react";
+import * as tus from "tus-js-client";
 import type { MediaView } from "@/lib/media";
 import { VideoMediaItem } from "./video-media-item";
 
 /**
- * CMS video management — MVP manual Stream mode.
+ * CMS video upload + management — no-webhook MVP.
  *
- * The admin uploads the video inside the Cloudflare Stream dashboard, copies
- * the video UID (or the shareable URL) and pastes it here. The app stores the
- * UID as providerAssetId and derives poster/preview/embed URLs from it. The
- * admin manually marks each video READY once Cloudflare shows it as ready.
+ * Videos upload directly from the browser to Cloudflare Stream via a one-time
+ * TUS URL (resumable, so large files and flaky connections survive). The app
+ * server never touches the video bytes and the API token never reaches the
+ * client — the browser only receives the temporary upload URL.
  *
- * (Direct Creator Uploads + webhooks were removed for MVP; this component is
- * the only place to change when they return — the media architecture stays
- * provider-based.)
+ * Lifecycle: UPLOADING -> PROCESSING -> READY / FAILED. The READY/FAILED
+ * transition is detected by backend polling of Cloudflare's video details
+ * endpoint: a "Check status" button plus automatic polling (every 15s while
+ * this screen is open and something is pending). No webhooks, no inbound
+ * calls from Cloudflare.
  */
+
+const MAX_VIDEO_BYTES = 30 * 1024 * 1024 * 1024; // Stream hard cap: 30 GB
+const ALLOWED_TYPES = /^video\/(mp4|webm|quicktime|x-matroska|x-msvideo)$/;
+const AUTO_CHECK_INTERVAL_MS = 15_000;
+
+type UploadState = {
+  mediaId: string;
+  fileName: string;
+  progress: number;
+  error?: string;
+};
 
 export default function VideoManager({
   projectId,
@@ -26,38 +48,200 @@ export default function VideoManager({
   videos: MediaView[];
 }) {
   const [items, setItems] = useState<MediaView[]>(videos);
-  const [pastedUid, setPastedUid] = useState("");
-  const [adding, setAdding] = useState(false);
+  const [upload, setUpload] = useState<UploadState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [checking, setChecking] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const tusUploadRef = useRef<tus.Upload | null>(null);
 
-  async function handleAdd(e: React.FormEvent) {
-    e.preventDefault();
-    const value = pastedUid.trim();
-    if (!value) return;
+  const hasPending = items.some(
+    (m) => m.status === "processing" || m.status === "uploading"
+  );
 
-    setAdding(true);
-    setError(null);
+  /** Asks the backend to poll Cloudflare for the given (or all pending) videos. */
+  const checkStatus = useCallback(async (mediaIds?: string[]) => {
+    const pendingIds =
+      mediaIds ??
+      items
+        .filter((m) => m.status === "processing" || m.status === "uploading")
+        .map((m) => m.id);
+    if (pendingIds.length === 0) return;
     try {
-      const res = await fetch("/api/admin/media/video", {
+      const res = await fetch("/api/admin/media/video/check-status", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId, video: value }),
+        body: JSON.stringify({ mediaIds: pendingIds }),
       });
-      const data = (await res.json().catch(() => ({}))) as {
-        media?: MediaView;
-        error?: string;
-      };
-      if (!res.ok || !data.media) {
-        throw new Error(data.error ?? "Couldn't add the video.");
+      if (!res.ok) return;
+      const data = (await res.json()) as { media: MediaView[] };
+      if (data.media.length > 0) {
+        setItems((prev) =>
+          prev.map((m) => data.media.find((u) => u.id === m.id) ?? m)
+        );
       }
-      setItems((prev) => [...prev, data.media!]);
-      setPastedUid("");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't add the video.");
-    } finally {
-      setAdding(false);
+    } catch {
+      // Transient network error — next tick retries.
     }
+  }, [items]);
+
+  // Automatic polling while the admin is on this page with pending videos.
+  useEffect(() => {
+    if (!hasPending) return;
+    const timer = setInterval(() => {
+      void checkStatus();
+    }, AUTO_CHECK_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, [hasPending, checkStatus]);
+
+  const requestUploadUrl = useCallback(
+    async (file: File) => {
+      const res = await fetch("/api/admin/media/video/upload-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectId,
+          fileName: file.name,
+          fileSizeBytes: file.size,
+          fileType: file.type || "video/mp4",
+        }),
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(data.error ?? "Couldn't start the upload.");
+      }
+      return (await res.json()) as {
+        mediaId: string;
+        streamUid: string;
+        uploadUrl: string;
+      };
+    },
+    [projectId]
+  );
+
+  const handleFiles = useCallback(
+    async (files: FileList | File[]) => {
+      setError(null);
+      const file = Array.from(files).find((f) => ALLOWED_TYPES.test(f.type));
+      if (!file) {
+        setError("Please choose a video file (MP4, WebM, MOV, MKV or AVI).");
+        return;
+      }
+      if (file.size > MAX_VIDEO_BYTES) {
+        setError("That video is too large (limit is 30 GB).");
+        return;
+      }
+
+      let session: { mediaId: string; streamUid: string; uploadUrl: string };
+      try {
+        session = await requestUploadUrl(file);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Couldn't start the upload.");
+        return;
+      }
+
+      // Show the new item immediately in UPLOADING state.
+      setItems((prev) => [
+        ...prev,
+        {
+          id: session.mediaId,
+          type: "video",
+          provider: "cloudflare_stream",
+          providerAssetId: session.streamUid,
+          url: "",
+          originalUrl: "",
+          variantWidths: [],
+          width: null,
+          height: null,
+          fileSizeBytes: file.size,
+          altText: null,
+          sortOrder: prev.length,
+          status: "uploading",
+          lqipDataUrl: null,
+          posterUrl: null,
+          title: file.name,
+          description: null,
+          durationSeconds: null,
+          aspectRatio: null,
+          previewEnabled: false,
+          previewStartSeconds: 0,
+          previewDurationSeconds: 4,
+          seoTitle: null,
+          seoDescription: null,
+          publishedAt: null,
+          customPosterUrl: null,
+          streamThumbnailUrl: null,
+          streamEmbedUrl: null,
+          streamPreviewUrl: null,
+        },
+      ]);
+      setUpload({ mediaId: session.mediaId, fileName: file.name, progress: 0 });
+
+      // Upload directly to Cloudflare Stream with resumable TUS.
+      const tusUpload = new tus.Upload(file, {
+        uploadUrl: session.uploadUrl,
+        endpoint: null as unknown as string, // uploadUrl provided; no creation endpoint
+        retryDelays: [0, 1000, 3000, 5000],
+        chunkSize: 64 * 1024 * 1024,
+        metadata: {
+          filename: file.name,
+          filetype: file.type || "video/mp4",
+        },
+        onError: (err) => {
+          setError(`Upload failed: ${err.message} You can retry or delete the video.`);
+          setUpload((prev) => (prev ? { ...prev, error: err.message } : prev));
+        },
+        onProgress: (bytesUploaded, bytesTotal) => {
+          const pct = Math.round((bytesUploaded / bytesTotal) * 100);
+          setUpload((prev) => (prev ? { ...prev, progress: pct } : prev));
+        },
+        onSuccess: async () => {
+          setUpload(null);
+          // Tell the backend the bytes are at Cloudflare — status -> PROCESSING.
+          // READY arrives via the check-status polling.
+          try {
+            const res = await fetch("/api/admin/media/video/complete", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                mediaId: session.mediaId,
+                streamUid: session.streamUid,
+              }),
+            });
+            if (res.ok) {
+              const data = (await res.json()) as { media: MediaView };
+              setItems((prev) =>
+                prev.map((m) => (m.id === session.mediaId ? data.media : m))
+              );
+              // First status check right away — often still processing.
+              void checkStatus([session.mediaId]);
+            } else {
+              setError("Upload finished but the video state couldn't be updated. Refresh to sync.");
+            }
+          } catch {
+            setError("Upload finished but the video state couldn't be updated. Refresh to sync.");
+          }
+        },
+      });
+      tusUploadRef.current = tusUpload;
+      tusUpload.start();
+    },
+    [requestUploadUrl, checkStatus]
+  );
+
+  function cancelUpload() {
+    tusUploadRef.current?.abort();
+    tusUploadRef.current = null;
+    setUpload(null);
+    setError("Upload cancelled. You can retry it from the video list.");
+  }
+
+  async function retryUpload(id: string) {
+    setError(null);
+    // One-time upload URLs can't be reopened; simplest safe path: delete the
+    // stuck row and upload again.
+    await handleDelete(id);
+    inputRef.current?.click();
   }
 
   async function handleDelete(id: string) {
@@ -86,46 +270,45 @@ export default function VideoManager({
 
   return (
     <div className="space-y-4">
-      <h2 className="flex items-center gap-2 text-lg font-medium text-white">
-        <Film size={18} /> Videos
-      </h2>
-
-      <form onSubmit={handleAdd} className="space-y-2">
-        <label
-          htmlFor="stream-uid"
-          className="block text-xs text-zinc-400"
-        >
-          Add a video: upload it in the{" "}
-          <a
-            href="https://dash.cloudflare.com/?to=/:account/stream"
-            target="_blank"
-            rel="noreferrer"
-            className="underline hover:text-zinc-200"
-          >
-            Cloudflare Stream dashboard
-          </a>
-          , then paste the video UID or its URL here.
-        </label>
-        <div className="flex gap-2">
-          <input
-            id="stream-uid"
-            value={pastedUid}
-            onChange={(e) => setPastedUid(e.target.value)}
-            placeholder="e.g. 6c9bd7f81e6d_example_uid_32_chars_or_paste_url"
-            spellCheck={false}
-            autoComplete="off"
-            className="min-w-0 flex-1 rounded border border-zinc-700 bg-zinc-950 px-3 py-2 font-mono text-sm text-white outline-none placeholder:text-zinc-600 focus:border-zinc-500"
-          />
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="flex items-center gap-2 text-lg font-medium text-white">
+          <Film size={18} /> Videos
+        </h2>
+        <div className="flex items-center gap-2">
+          {hasPending ? (
+            <button
+              type="button"
+              onClick={() => {
+                setChecking(true);
+                void checkStatus().finally(() => setChecking(false));
+              }}
+              disabled={checking}
+              className="flex items-center gap-2 rounded border border-zinc-700 px-3 py-2 text-sm text-zinc-200 hover:border-zinc-500 disabled:opacity-50"
+            >
+              <RefreshCw size={14} className={checking ? "animate-spin" : ""} />
+              Check status
+            </button>
+          ) : null}
           <button
-            type="submit"
-            disabled={adding || !pastedUid.trim()}
-            className="flex shrink-0 items-center gap-2 rounded border border-zinc-700 px-3 py-2 text-sm text-zinc-200 hover:border-zinc-500 disabled:opacity-50"
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            disabled={!!upload}
+            className="flex items-center gap-2 rounded border border-zinc-700 px-3 py-2 text-sm text-zinc-200 hover:border-zinc-500 disabled:opacity-50"
           >
-            {adding ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
-            Add video
+            <UploadCloud size={16} /> Upload video
           </button>
         </div>
-      </form>
+        <input
+          ref={inputRef}
+          type="file"
+          accept="video/mp4,video/webm,video/quicktime,video/x-matroska,video/x-msvideo"
+          className="hidden"
+          onChange={(e) => {
+            if (e.target.files?.length) void handleFiles(e.target.files);
+            e.target.value = "";
+          }}
+        />
+      </div>
 
       {error ? (
         <p
@@ -136,10 +319,42 @@ export default function VideoManager({
         </p>
       ) : null}
 
+      {upload ? (
+        <div className="rounded border border-zinc-800 bg-zinc-900 p-3">
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <p className="truncate text-sm text-zinc-300">
+              Uploading {upload.fileName}… {upload.progress}%
+            </p>
+            <button
+              type="button"
+              onClick={cancelUpload}
+              className="text-xs text-zinc-500 underline hover:text-zinc-300"
+            >
+              Cancel
+            </button>
+          </div>
+          <div className="h-1.5 overflow-hidden rounded bg-zinc-800">
+            <div
+              className="h-full bg-zinc-100 transition-[width]"
+              style={{ width: `${upload.progress}%` }}
+            />
+          </div>
+          {upload.error ? (
+            <button
+              type="button"
+              onClick={() => retryUpload(upload.mediaId)}
+              className="mt-2 flex items-center gap-1 text-xs text-amber-400 underline"
+            >
+              <RotateCcw size={11} /> Retry upload
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
       {items.length === 0 ? (
         <p className="rounded-lg border border-dashed border-zinc-700 p-8 text-center text-sm text-zinc-500">
-          No videos yet. Add a Stream video UID above — the poster, preview and
-          player are derived from it automatically.
+          No videos yet. Uploads go directly to the video CDN — large files
+          supported, resumable if your connection drops.
         </p>
       ) : (
         <ul className="space-y-3">
@@ -150,6 +365,7 @@ export default function VideoManager({
               onPatched={handlePatched}
               onDelete={handleDelete}
               deleting={deletingId === item.id}
+              onCheckStatus={() => checkStatus([item.id])}
             />
           ))}
         </ul>
@@ -161,10 +377,10 @@ export default function VideoManager({
 export function StatusBadge({ status }: { status: MediaView["status"] }) {
   const map: Record<MediaView["status"], { label: string; cls: string; spin?: boolean }> = {
     uploading: { label: "Uploading", cls: "text-zinc-400", spin: true },
-    processing: { label: "Waiting for manual READY", cls: "text-amber-400", spin: true },
+    processing: { label: "Processing…", cls: "text-amber-400", spin: true },
     ready: { label: "Ready", cls: "text-green-400" },
     published: { label: "Published", cls: "text-green-400" },
-    failed: { label: "Marked failed", cls: "text-red-400" },
+    failed: { label: "Processing failed — retry or replace", cls: "text-red-400" },
     unpublished: { label: "Hidden", cls: "text-zinc-500" },
     deleted: { label: "Deleted", cls: "text-zinc-600" },
   };
