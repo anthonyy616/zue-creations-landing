@@ -10,6 +10,11 @@ import { info, warn } from "@/lib/log";
 
 const patchSchema = z.object({
   title: z.string().trim().max(200).optional(),
+  /** Manual lifecycle marking (MVP Stream mode: admin flips to ready/failed
+   *  after checking the Cloudflare dashboard; also used to hide/show). */
+  status: z
+    .enum(["processing", "ready", "failed", "unpublished"])
+    .optional(),
   description: z.string().trim().max(2000).optional(),
   altText: z.string().trim().max(300).optional(),
   previewEnabled: z.boolean().optional(),
@@ -67,6 +72,12 @@ export async function PATCH(
   const updates: Partial<typeof media.$inferInsert> = { updatedAt: new Date() };
   const d = parsed.data;
   if (d.title !== undefined) updates.title = d.title;
+  if (d.status !== undefined) {
+    updates.status = d.status;
+    if (d.status === "ready" || d.status === "failed") {
+      updates.publishedAt = row.publishedAt ?? new Date();
+    }
+  }
   if (d.description !== undefined) updates.description = d.description;
   if (d.altText !== undefined) updates.altText = d.altText;
   if (d.previewEnabled !== undefined) updates.previewEnabled = d.previewEnabled;

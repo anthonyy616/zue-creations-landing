@@ -31,6 +31,9 @@ export type MediaSlide = {
   providerAssetId: string | null;
   /** Stream embed URL — the full player mounts only after explicit click. */
   embedUrl: string | null;
+  /** Derived animated preview URL (Stream videos; admin-opted-in only). */
+  previewUrl: string | null;
+  previewEnabled: boolean;
 };
 
 /** Builds a serializable slide from a MediaView, optionally tagged with its project. */
@@ -53,5 +56,7 @@ export function mediaToSlide(
     provider: media.provider,
     providerAssetId: media.providerAssetId,
     embedUrl: media.streamEmbedUrl,
+    previewUrl: media.streamPreviewUrl,
+    previewEnabled: media.previewEnabled,
   };
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, Loader2 } from "lucide-react";
+import { ChevronDown, Loader2, CheckCircle2 } from "lucide-react";
 import type { MediaView } from "@/lib/media";
 import { StatusBadge, TrashButton } from "./video-manager";
 
@@ -42,7 +42,33 @@ export function VideoMediaItem({
   const posterSrc =
     item.customPosterUrl ?? item.posterUrl ?? item.streamThumbnailUrl ?? null;
 
+  // MVP manual Stream mode: the admin decides when the video is playable.
   const publishBlocked = item.status === "uploading" || item.status === "processing";
+  const showMarkReady = item.status === "processing" || item.status === "uploading" || item.status === "failed";
+  const showHideToggle =
+    item.status === "ready" || item.status === "published" || item.status === "unpublished";
+
+  async function setStatus(next: "ready" | "failed" | "unpublished") {
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/media/${item.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: next }),
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(data.error ?? "Status update failed");
+      }
+      const data = (await res.json()) as { media: MediaView };
+      onPatched(data.media);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Status update failed");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   async function save() {
     setSaving(true);
@@ -93,9 +119,14 @@ export function VideoMediaItem({
             {item.title ?? "Untitled video"}
           </p>
           <StatusBadge status={item.status} />
+          {item.providerAssetId ? (
+            <p className="truncate font-mono text-[10px] text-zinc-600" title={item.providerAssetId}>
+              UID {item.providerAssetId}
+            </p>
+          ) : null}
           {publishBlocked ? (
             <p className="text-[11px] text-amber-400/80">
-              Publishing is blocked until processing completes.
+              Mark it READY below once Cloudflare shows the video as ready.
             </p>
           ) : null}
         </div>
@@ -121,6 +152,52 @@ export function VideoMediaItem({
               {error}
             </p>
           ) : null}
+
+          <div className="flex flex-wrap items-center gap-2 rounded border border-zinc-800 p-3">
+            <p className="w-full text-[11px] uppercase tracking-wide text-zinc-500">
+              Manual video state
+            </p>
+            {showMarkReady ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setStatus("ready")}
+                  disabled={saving}
+                  className="flex items-center gap-1.5 rounded bg-green-600/80 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-600 disabled:opacity-50"
+                >
+                  <CheckCircle2 size={13} /> Mark READY (visible on site)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStatus("failed")}
+                  disabled={saving}
+                  className="rounded border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:border-zinc-500 disabled:opacity-50"
+                >
+                  Mark failed
+                </button>
+              </>
+            ) : null}
+            {showHideToggle ? (
+              <button
+                type="button"
+                onClick={() => setStatus("unpublished")}
+                disabled={saving}
+                className="rounded border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:border-zinc-500 disabled:opacity-50"
+              >
+                Hide from site
+              </button>
+            ) : null}
+            {item.status === "unpublished" ? (
+              <button
+                type="button"
+                onClick={() => setStatus("ready")}
+                disabled={saving}
+                className="rounded border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:border-zinc-500 disabled:opacity-50"
+              >
+                Show again
+              </button>
+            ) : null}
+          </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="block text-xs text-zinc-400">

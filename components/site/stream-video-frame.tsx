@@ -10,6 +10,9 @@ import { useState } from "react";
  * No video bytes load until the visitor clicks; the Stream embed mounts
  * only then (media-rules.md §4, §7). Falls back to a neutral placeholder
  * when no poster/thumbnail is available yet.
+ *
+ * If the admin enabled the motion preview, a lightweight animated preview
+ * GIF (derived from the Stream UID) swaps in on hover — still no player.
  */
 export default function StreamVideoFrame({
   slide,
@@ -20,9 +23,14 @@ export default function StreamVideoFrame({
   contain?: boolean;
 }) {
   const [opened, setOpened] = useState(false);
+  const [hovered, setHovered] = useState(false);
 
   const poster = slide.poster;
   const embedUrl = slide.embedUrl;
+  const showPreview =
+    slide.previewEnabled && Boolean(slide.previewUrl) && !opened;
+
+  const objectClass = contain ? "object-contain" : "object-cover";
 
   if (!embedUrl) {
     // No embed available (e.g. customer subdomain not configured yet):
@@ -34,7 +42,7 @@ export default function StreamVideoFrame({
         alt={slide.alt ?? ""}
         loading="lazy"
         decoding="async"
-        className={`h-full w-full ${contain ? "object-contain" : "object-cover"}`}
+        className={`h-full w-full ${objectClass}`}
       />
     ) : (
       <div className="h-full w-full bg-white/[0.04]" />
@@ -43,15 +51,28 @@ export default function StreamVideoFrame({
 
   return (
     <>
-      <div className="relative h-full w-full">
-        {poster ? (
+      <div
+        className="relative h-full w-full"
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+      >
+        {showPreview && hovered ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={slide.previewUrl ?? ""}
+            alt={slide.alt ?? ""}
+            loading="lazy"
+            decoding="async"
+            className={`h-full w-full ${objectClass}`}
+          />
+        ) : poster ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={poster}
             alt={slide.alt ?? ""}
             loading="lazy"
             decoding="async"
-            className={`h-full w-full ${contain ? "object-contain" : "object-cover"}`}
+            className={`h-full w-full ${objectClass}`}
           />
         ) : (
           <div className="h-full w-full bg-white/[0.04]" />
@@ -92,7 +113,7 @@ export default function StreamVideoFrame({
             description: null,
             durationSeconds: null,
             aspectRatio: null,
-            previewEnabled: false,
+            previewEnabled: slide.previewEnabled,
             previewStartSeconds: 0,
             previewDurationSeconds: 4,
             seoTitle: null,
@@ -101,7 +122,7 @@ export default function StreamVideoFrame({
             customPosterUrl: null,
             streamThumbnailUrl: slide.poster,
             streamEmbedUrl: embedUrl,
-            streamPreviewUrl: null,
+            streamPreviewUrl: slide.previewUrl,
           }}
           projectTitle={slide.alt ?? slide.label ?? "Video"}
           onClosed={() => setOpened(false)}

@@ -1,143 +1,21 @@
 /**
- * Server-side Cloudflare Stream API helper.
+ * Server-side Cloudflare Stream helper (MVP: manual UID mode).
+ *
+ * How videos get in for now:
+ *  1. The admin uploads the video manually inside the Cloudflare Stream
+ *     dashboard.
+ *  2. The admin copies the video UID and pastes it into the CMS.
+ *  3. The app stores the UID as providerAssetId and derives all playback
+ *     URLs (thumbnail / preview / embed) from it — no extra API calls.
  *
  * Security rules (media-rules.md §3):
  *  - CLOUDFLARE_STREAM_API_TOKEN and CLOUDFLARE_ACCOUNT_ID are read from env
  *    only. They must never appear in NEXT_PUBLIC_* vars, client bundles, or
- *    API responses.
- *  - The browser only ever receives the temporary one-time direct-upload URL.
- *
- * All functions throw StreamConfigError when configuration is missing so
- * routes can return a clean 503 instead of leaking details.
+ *    API responses. The browser only ever receives derived public URLs.
+ *  - The API token is currently only used for hard-deleting Stream assets
+ *    (admin purge + cleanup job). Direct Creator Uploads and webhook
+ *    registration can be layered back in later without schema changes.
  */
-
-const STREAM_API_BASE = "https://api.cloudflare.com/client/v4";
-
-export const CLOUDFLARE_ACCOUNT_ID = process.env.CLOUDFLARE_ACCOUNT_ID ?? "";
-export const CLOUDFLARE_STREAM_API_TOKEN =
-  process.env.CLOUDFLARE_STREAM_API_TOKEN ?? "";
-export const CLOUDFLARE_STREAM_WEBHOOK_SECRET =
-  process.env.CLOUDFLARE_STREAM_WEBHOOK_SECRET ?? "";
-
-export class StreamConfigError extends Error {
-  constructor() {
-    super("Video uploads are not configured. Ask the site owner to enable them.");
-    this.name = "StreamConfigError";
-  }
-}
-
-export function isStreamConfigured(): boolean {
-  return Boolean(CLOUDFLARE_ACCOUNT_ID && CLOUDFLARE_STREAM_API_TOKEN);
-}
-
-function assertConfigured(): void {
-  if (!isStreamConfigured()) throw new StreamConfigError();
-}
-
-/** Core JSON call against the Stream API with bearer auth. */
-async function streamApi<T>(
-  path: string,
-  init: RequestInit = {}
-): Promise<T> {
-  assertConfigured();
-  const res = await fetch(`${STREAM_API_BASE}/accounts/${CLOUDFLARE_ACCOUNT_ID}${path}`, {
-    ...init,
-    headers: {
-      Authorization: `Bearer ${CLOUDFLARE_STREAM_API_TOKEN}`,
-      ...(init.body ? { "Content-Type": "application/json" } : {}),
-      ...(init.headers ?? {}),
-    },
-    cache: "no-store",
-  });
-
-  const payload = (await res.json().catch(() => null)) as {
-    success?: boolean;
-    errors?: { code?: number; message?: string }[];
-    result?: T;
-  } | null;
-
-  if (!res.ok || !payload?.success) {
-    const message =
-      payload?.errors?.[0]?.message ?? `Cloudflare Stream request failed (HTTP ${res.status})`;
-    throw new Error(message);
-  }
-  return payload.result as T;
-}
-
-/* ------------------------------------------------------------------ */
-/* Direct Creator Upload                                               */
-/* ------------------------------------------------------------------ */
-
-export type DirectUploadResult = {
-  /** Stream UID assigned to the video. */
-  uid: string;
-  /** One-time TUS upload URL for the browser. Never store as permanent id. */
-  uploadURL: string;
-};
-
-/**
- * Creates a Direct Creator Upload session.
- *
- * The returned uploadURL is one-time and expires; the browser uploads the
- * file straight to Cloudflare Stream with it (TUS protocol — required for
- * resumability and files over 200 MB).
- */
-export async function createDirectUploadUrl(options: {
-  maxDurationSeconds?: number;
-  creator?: string;
-  /** Optional human name kept in Stream's metadata. */
-  fileName?: string;
-  /** Restrict where the completed upload may be embedded/played. */
-  allowedOrigins?: string[];
-  requireSignedURLs?: boolean;
-}): Promise<DirectUploadResult> {
-  const body: Record<string, unknown> = {
-    maxDurationSeconds: options.maxDurationSeconds ?? 3600,
-  };
-  if (options.creator) body.creator = options.creator;
-  if (options.fileName) {
-    body.meta = { name: options.fileName };
-  }
-  if (options.allowedOrigins && options.allowedOrigins.length > 0) {
-    body.allowedOrigins = options.allowedOrigins;
-  }
-  if (options.requireSignedURLs !== undefined) {
-    body.requireSignedURLs = options.requireSignedURLs;
-  }
-
-  const result = await streamApi<DirectUploadResult>("/stream/direct_upload", {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
-  return result;
-}
-
-/* ------------------------------------------------------------------ */
-/* Asset status / deletion                                             */
-/* ------------------------------------------------------------------ */
-
-export type StreamVideoStatus = {
-  uid: string;
-  readyToStream: boolean;
-  status: { state: string; pctComplete?: string; errorReasonCode?: string; errorReasonText?: string };
-  duration?: number;
-  input?: { width?: number; height?: number };
-  thumbnail?: string;
-  created?: string;
-  modified?: string;
-};
-
-export async function getVideoStatus(uid: string): Promise<StreamVideoStatus> {
-  return streamApi<StreamVideoStatus>(`/stream/${uid}`);
-}
-
-/**
- * Deletes the Stream asset. Only called from authorized admin flows or a
- * future cleanup job — never from the public frontend (media-rules.md §38.5).
- */
-export async function deleteVideo(uid: string): Promise<void> {
-  await streamApi(`/stream/${uid}`, { method: "DELETE" });
-}
 
 /* ------------------------------------------------------------------ */
 /* Derived URLs (no API call needed)                                   */
@@ -179,45 +57,47 @@ export function streamEmbedUrl(uid: string): string | null {
 }
 
 /* ------------------------------------------------------------------ */
-/* Webhook verification                                                */
+/* Asset deletion (admin purge + cleanup job only)                     */
 /* ------------------------------------------------------------------ */
 
-import { createHmac, timingSafeEqual } from "node:crypto";
+const STREAM_API_BASE = "https://api.cloudflare.com/client/v4";
+
+export const CLOUDFLARE_ACCOUNT_ID = process.env.CLOUDFLARE_ACCOUNT_ID ?? "";
+export const CLOUDFLARE_STREAM_API_TOKEN =
+  process.env.CLOUDFLARE_STREAM_API_TOKEN ?? "";
+
+export function isStreamConfigured(): boolean {
+  return Boolean(CLOUDFLARE_ACCOUNT_ID && CLOUDFLARE_STREAM_API_TOKEN);
+}
 
 /**
- * Verifies the Webhook-Signature header Cloudflare Stream sends:
- *   Webhook-Signature: time=1230811200,sig1=60493…
- * sig1 = HMAC-SHA256(secret, `${time}.${rawBody}`) hex-encoded.
- * Rejects timestamps older than 5 minutes to deter replay.
+ * Deletes the Stream asset. Only called from authorized admin flows (purge)
+ * or the cleanup job — never from the public frontend (media-rules.md §38.5).
+ * Throws on failure so callers can keep the row and retry.
  */
-export function verifyStreamWebhook(
-  signatureHeader: string | null,
-  rawBody: string
-): boolean {
-  if (!CLOUDFLARE_STREAM_WEBHOOK_SECRET || !signatureHeader) return false;
+export async function deleteVideo(uid: string): Promise<void> {
+  if (!isStreamConfigured()) {
+    throw new Error(
+      "Cloudflare Stream is not configured (CLOUDFLARE_ACCOUNT_ID / CLOUDFLARE_STREAM_API_TOKEN)."
+    );
+  }
 
-  const parts = signatureHeader.split(",").reduce<Record<string, string>>((acc, part) => {
-    const [key, value] = part.split("=");
-    if (key && value) acc[key.trim()] = value.trim();
-    return acc;
-  }, {});
+  const res = await fetch(
+    `${STREAM_API_BASE}/accounts/${CLOUDFLARE_ACCOUNT_ID}/stream/${uid}`,
+    {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${CLOUDFLARE_STREAM_API_TOKEN}` },
+      cache: "no-store",
+    }
+  );
 
-  const time = parts["time"];
-  const sig = parts["sig1"];
-  if (!time || !sig) return false;
-
-  // Replay protection: 5 minutes.
-  const timestamp = Number(time);
-  if (!Number.isFinite(timestamp)) return false;
-  const skewMs = Math.abs(Date.now() - timestamp * 1000);
-  if (skewMs > 5 * 60 * 1000) return false;
-
-  const expected = createHmac("sha256", CLOUDFLARE_STREAM_WEBHOOK_SECRET)
-    .update(`${time}.${rawBody}`)
-    .digest("hex");
-
-  const a = Buffer.from(expected, "utf8");
-  const b = Buffer.from(sig, "utf8");
-  if (a.length !== b.length) return false;
-  return timingSafeEqual(a, b);
+  if (!res.ok) {
+    const payload = (await res.json().catch(() => null)) as {
+      errors?: { message?: string }[];
+    } | null;
+    throw new Error(
+      payload?.errors?.[0]?.message ??
+        `Cloudflare Stream delete failed (HTTP ${res.status})`
+    );
+  }
 }
