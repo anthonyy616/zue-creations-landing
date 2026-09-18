@@ -8,7 +8,11 @@ const nextConfig: NextConfig = {
 
   // sharp's native binaries must not be bundled into the serverless function.
   // Without this, Vercel may bloat cold starts or silently pick the wrong binary.
-  serverExternalPackages: ["sharp"],
+  // ffmpeg-static resolves its binary path relative to its own module directory
+  // at require-time — if Webpack bundles it, the path points into .next/server
+  // chunks where the binary doesn't exist ("...vendor-chunks/ffmpeg: No such
+  // file or directory"). Keeping it external preserves the real node_modules path.
+  serverExternalPackages: ["sharp", "ffmpeg-static"],
 
   // Reduce dev compile time by tree-shaking barrel imports from large UI libs.
   experimental: {

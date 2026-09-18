@@ -54,7 +54,7 @@ export default function SiteHeader() {
               <InstagramIcon size={17} strokeWidth={1.5} />
             </a>
           ) : null}
-          {process.env.WHATSAPP_PHONE_NUMBER ? (
+          {process.env.NEXT_PUBLIC_WHATSAPP_PHONE_NUMBER ? (
             <a
               href={buildWhatsAppUrl("Hello")}
               target="_blank"

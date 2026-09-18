@@ -9,7 +9,14 @@ import type { PackageDef } from "./packages";
  * or inferred on mobile).
  */
 
-export const DEFAULT_WA_NUMBER = (process.env.WHATSAPP_PHONE_NUMBER ?? "").replace(
+export const DEFAULT_WA_NUMBER = (
+  // Prefer the NEXT_PUBLIC_ var so client components render the same link the
+  // server rendered — a non-public env var is undefined in the client bundle
+  // and causes a hydration mismatch (server renders <a>, client renders none).
+  process.env.NEXT_PUBLIC_WHATSAPP_PHONE_NUMBER ??
+    process.env.WHATSAPP_PHONE_NUMBER ??
+    ""
+).replace(
   /[^\d]/g,
   ""
 );

@@ -64,19 +64,11 @@ export default function ThemeToggle() {
     apply(theme === "olive" ? "black" : "olive");
   }
 
-  // Guard: if theme is null on first render, use a default that matches
-  // what the server would render (no rotation). The useEffect will update
-  // to the stored theme after mount, but the initial render must match
-  // what the server produced to avoid hydration mismatch.
-  // The server renders the button with isOlive=false (no rotation).
-  // If the stored theme is "olive", the client will correct after mount.
-  // This brief mismatch is acceptable because the visual difference is
-  // minimal (just the rotation of the inner disc) and it resolves instantly.
+  // First render (server AND client) uses theme === null → isOlive=false,
+  // so both trees match. The useEffect above corrects to the stored theme
+  // after hydration, which is a normal post-hydration state update.
   const isOlive = theme === "olive";
-  // Use a default false for the initial server render to match.
-  // After useEffect runs, this will update to the correct value.
-  const isOliveForRender = typeof window !== "undefined" ? isOlive : false;
-  const label = isOliveForRender ? "Switch to black theme" : "Switch to olive theme";
+  const label = isOlive ? "Switch to black theme" : "Switch to olive theme";
 
   return (
     <button
@@ -84,7 +76,7 @@ export default function ThemeToggle() {
       onClick={toggle}
       aria-label={label}
       title={label}
-      aria-pressed={isOliveForRender}
+      aria-pressed={isOlive}
       className="grid h-9 w-9 shrink-0 cursor-pointer place-items-center rounded-full border border-line text-fg outline-none transition-colors hover:border-accent focus-visible:ring-2 focus-visible:ring-accent"
     >
       {/* Split yellow/olive disc — flips on every switch. */}

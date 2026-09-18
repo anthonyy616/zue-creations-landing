@@ -60,10 +60,10 @@ export default function SiteFooter() {
                     </a>
                   </li>
                 ) : null}
-                {process.env.WHATSAPP_PHONE_NUMBER || process.env.NEXT_PUBLIC_WHATSAPP_URL ? (
+                {process.env.NEXT_PUBLIC_WHATSAPP_PHONE_NUMBER || process.env.NEXT_PUBLIC_WHATSAPP_URL ? (
                   <li>
                     <a
-                      href={process.env.NEXT_PUBLIC_WHATSAPP_URL || `https://wa.me/${process.env.WHATSAPP_PHONE_NUMBER}?text=${encodeURIComponent("Hello")}`}
+                      href={process.env.NEXT_PUBLIC_WHATSAPP_URL || `https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_PHONE_NUMBER}?text=${encodeURIComponent("Hello")}`}
                       target="_blank"
                       rel="noreferrer"
                       className="text-muted transition-colors hover:text-accent inline-flex items-center gap-1"

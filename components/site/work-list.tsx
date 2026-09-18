@@ -129,7 +129,7 @@ export function ProjectRow({
           href={safeInstagramUrl(project.instagramUrl) ?? "#"}
           target="_blank"
           rel="noreferrer"
-          className="mt-3 inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.18em] text-accent transition-colors hover:text-accent/80"
+          className="relative z-10 mt-3 inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.18em] text-accent transition-colors hover:text-accent/80"
           aria-label="View on Instagram"
         >
           <InstagramIcon size={12} strokeWidth={1.5} />
@@ -143,11 +143,21 @@ export function ProjectRow({
   );
 
   return (
-    <Link
-      href={`/work/${project.slug}`}
+    // The row itself is a <div>, not an <a>: the project link is a
+    // "stretched link" overlay so nested links (Instagram) stay valid HTML.
+    <div
       data-cursor="view"
-      className="group grid gap-6 py-10 outline-none lg:grid-cols-12 lg:items-center lg:gap-x-6 focus-visible:ring-2 focus-visible:ring-accent transition-all duration-500 hover:border-zinc-600 hover:shadow-[0_0_20px_-5px_rgba(245,245,76,0.08)]"
+      className="group relative grid gap-6 py-10 outline-none lg:grid-cols-12 lg:items-center lg:gap-x-6 transition-all duration-500 hover:border-zinc-600 hover:shadow-[0_0_20px_-5px_rgba(245,245,76,0.08)]"
     >
+        {/* Stretched-link overlay — makes the whole row clickable without
+            nesting any links. Clicks pass through to it everywhere except
+            elements raised above it (the Instagram link). */}
+        <Link
+          href={`/work/${project.slug}`}
+          aria-label={`View project: ${project.title}`}
+          className="absolute inset-0 z-0 outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        />
+
         {/* Numeric index — a quiet running page number at the outer edge. */}
         <span
           aria-hidden="true"
@@ -194,7 +204,7 @@ export function ProjectRow({
         >
           {meta}
         </div>
-    </Link>
+    </div>
   );
 }
 
