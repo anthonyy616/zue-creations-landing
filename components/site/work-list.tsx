@@ -136,9 +136,14 @@ export function ProjectRow({
           View on Instagram
         </a>
       ) : null}
-      <span className="mt-3 inline-flex items-center gap-1 text-[11px] font-medium uppercase tracking-[0.18em] text-accent">
-        View project <ArrowUpRight size={13} strokeWidth={1.5} />
-      </span>
+      {/* Block wrapper keeps "View project" on its own line directly below
+          the Instagram link (or the description) instead of flowing beside
+          it — tight spacing, but no collision on mobile or laptop. */}
+      <div className="mt-2.5">
+        <span className="inline-flex items-center gap-1 text-[11px] font-medium uppercase tracking-[0.18em] text-accent">
+          View project <ArrowUpRight size={13} strokeWidth={1.5} />
+        </span>
+      </div>
     </>
   );
 
