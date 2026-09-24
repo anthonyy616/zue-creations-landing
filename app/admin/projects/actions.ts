@@ -67,11 +67,12 @@ export async function createProject(
     return { ok: false, error: "A project with this web address already exists. Try a different one." };
   }
 
+  let createdId: string;
   try {
     const [created] = await db.insert(projects).values(data).returning();
     info("createProject: project created", { operation: "project.create", context: { projectId: created.id, slug: created.slug } });
     revalidateProjectPublic(created.slug, created.category);
-    redirect(`/admin/projects/${created.id}`);
+    createdId = created.id;
   } catch (err) {
     error("createProject: database insert failed", err, {
       operation: "project.create",
@@ -79,6 +80,8 @@ export async function createProject(
     });
     return { ok: false, error: "Couldn't create the project. Please try again." };
   }
+
+  redirect(`/admin/projects/${createdId}`);
 }
 
 export async function updateProject(

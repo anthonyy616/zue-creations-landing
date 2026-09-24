@@ -1,7 +1,6 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { z } from "zod";
 import { getSession } from "@/lib/session";
 import { verifyCredentials } from "@/lib/auth";
@@ -53,16 +52,13 @@ export async function loginAction(
     await session.save();
 
     info("Login succeeded", { operation: "login", context: { userId: user.id, email } });
-    redirect("/admin/dashboard");
   } catch (err) {
-    if (isRedirectError(err)) {
-      throw err;
-    }
-
     error("Login action threw an unexpected error", err, {
       operation: "login",
       context: { email },
     });
     return { error: "Something went wrong. Please try again." };
   }
+
+  redirect("/admin/dashboard");
 }
